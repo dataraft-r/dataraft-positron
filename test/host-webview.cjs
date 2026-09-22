@@ -219,6 +219,19 @@ exports.exerciseWebview = async (document) => {
     for (const context of browser.contexts()) {
       for (const page of context.pages()) {
         const prefix = path.join(directory, String(index++));
+        console.error(
+          "Workbench failure notifications:",
+          JSON.stringify(
+            (
+              await page
+                .getByRole("alert")
+                .allTextContents()
+                .catch(() => [])
+            )
+              .slice(0, 5)
+              .map((text) => text.slice(0, 500)),
+          ),
+        );
         await page
           .screenshot({ path: `${prefix}.png`, timeout: 5000 })
           .catch(() => {});

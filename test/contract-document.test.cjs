@@ -195,7 +195,12 @@ test(
       dirty = true;
     const errors = [],
       diffs = [];
-    let pendingDiff, diffStarted, documentChanged;
+    let pendingDiff,
+      diffStarted,
+      documentChanged,
+      pendingApply,
+      applyStarted,
+      disposePanel;
     let renderedHtml = "",
       renderCount = 0;
     const disposable = { dispose() {} };
@@ -258,6 +263,8 @@ test(
           current = edit.text;
           version++;
           documentChanged({ document: doc });
+          applyStarted?.();
+          if (pendingApply) await pendingApply;
           return true;
         },
       },
@@ -305,7 +312,10 @@ test(
           return disposable;
         },
       },
-      onDidDispose: () => disposable,
+      onDidDispose: (handler) => {
+        disposePanel = handler;
+        return disposable;
+      },
     };
     await provider.resolveCustomTextEditor(doc, panel);
     await receive({ type: "validate", version });
@@ -388,6 +398,58 @@ test(
     assert.match(current, /name: 'Reviewed'/);
     assert.match(current, /# unsaved before opening/);
     assert.equal(saveCalls, 0);
+
+    pendingDiff = undefined;
+    await preview();
+    let finishApply;
+    pendingApply = new Promise((resolve) => {
+      finishApply = resolve;
+    });
+    const applying = new Promise((resolve) => {
+      applyStarted = resolve;
+    });
+    const oldVersion = version;
+    const activeApply = receive({ type: "apply", version });
+    await applying;
+    const beforeQueuedPreview = diffs.length;
+    const newVersionPreview = preview();
+    const staleDiscard = receive({ type: "discard", version: oldVersion });
+    assert.equal(
+      diffs.length,
+      beforeQueuedPreview,
+      "new preview waits for apply completion",
+    );
+    finishApply();
+    await Promise.all([activeApply, newVersionPreview, staleDiscard]);
+    assert.equal(
+      diffs.length,
+      beforeQueuedPreview + 1,
+      "queued new-version preview executes exactly once",
+    );
+    assert.match(panel.webview.html, /Apply preview to document/);
+    assert.match(errors.at(-1), /document changed/);
+
+    // One active mutation plus seven pending actions is the bounded queue.
+    pendingApply = new Promise((resolve) => {
+      finishApply = resolve;
+    });
+    const applyingAgain = new Promise((resolve) => {
+      applyStarted = resolve;
+    });
+    const finalApply = receive({ type: "apply", version });
+    await applyingAgain;
+    const beforeDisposal = diffs.length;
+    const pending = Array.from({ length: 7 }, () => preview());
+    await preview();
+    assert.match(errors.at(-1), /Too many pending editor actions/);
+    disposePanel();
+    finishApply();
+    await Promise.all([finalApply, ...pending]);
+    assert.equal(
+      diffs.length,
+      beforeDisposal,
+      "disposed editor never executes queued work",
+    );
   },
 );
 

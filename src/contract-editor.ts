@@ -64,10 +64,13 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
       let proposal:
         | { text: string; version: number; diskHash: string; edited: string }
         | undefined;
-      let busy = false;
+      let commands = Promise.resolve();
+      let pendingCommands = 0;
+      let disposed = false;
       let rendered: { body: string; script: string } | undefined;
       let sampleIssues: Issue[] = [];
       const update = (): void => {
+        if (disposed) return;
         let body: string;
         try {
           const form = inspectContract(document.getText());
@@ -129,231 +132,246 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
             update();
           }
         }),
-        panel.webview.onDidReceiveMessage(async (message) => {
-          if (busy) return;
-          busy = true;
-          try {
-            if (
-              !message ||
-              typeof message !== "object" ||
-              message.version !== document.version
-            )
-              throw new Error(
-                "The document changed. Use the refreshed editor.",
-              );
-            if (message.type === "text") {
-              await vscode.commands.executeCommand(
-                "vscode.openWith",
-                document.uri,
-                "default",
-              );
-              return;
-            }
-            if (message.type === "diff") {
-              await showSavedDiff(document);
-              return;
-            }
-            if (message.type === "profile") {
-              const captured = {
-                text: document.getText(),
-                version: document.version,
-                diskHash: diskBaseline,
-              };
-              const response = await vscode.commands.executeCommand<
-                Envelope | undefined
-              >("dataraft.profile");
-              if (!response || response.error || response.kind !== "profile")
-                return;
-              const choices = profileColumnProposals(
-                captured.text,
-                response.data,
-              ).map((item) => ({
-                label: item.name,
-                description: item.detail,
-                operation: item.operation,
-                picked: false,
-              }));
-              if (!choices.length) {
-                void vscode.window.showInformationMessage(
-                  "No supported column changes were found in this sample.",
+        panel.webview.onDidReceiveMessage((message) => {
+          if (disposed) return;
+          if (pendingCommands >= 8) {
+            void vscode.window.showErrorMessage(
+              "Too many pending editor actions. Wait for the current action to finish and try again.",
+            );
+            return;
+          }
+          pendingCommands++;
+          // A refreshed iframe can submit the new document version before an
+          // applyEdit promise settles. Serialize actions instead of losing clicks.
+          const next = commands.then(async () => {
+            try {
+              if (disposed) return;
+              if (
+                !message ||
+                typeof message !== "object" ||
+                message.version !== document.version
+              )
+                throw new Error(
+                  "The document changed. Use the refreshed editor.",
+                );
+              if (message.type === "text") {
+                await vscode.commands.executeCommand(
+                  "vscode.openWith",
+                  document.uri,
+                  "default",
                 );
                 return;
               }
-              const selected = await vscode.window.showQuickPick(choices, {
-                canPickMany: true,
-                title: "Select inferred columns to preview",
-                placeHolder:
-                  "Choose explicitly; required flags reflect this sample only.",
-              });
-              if (!selected?.length) return;
-              const currentDisk = contentHash(await diskText(document.uri));
-              assertSnapshot(captured, {
-                text: document.getText(),
-                version: document.version,
-                diskHash: currentDisk,
-              });
-              const edited = editContract(
-                captured.text,
-                selected.map((item) => item.operation),
-              );
-              proposal = { ...captured, edited };
-              update();
-              // Displaying immutable snapshots must not lock enabled Apply/Discard
-              // controls while the editor host is still opening the diff tab.
-              const displayedProposal = proposal;
-              void vscode.commands
-                .executeCommand(
-                  "vscode.diff",
-                  snapshot(captured.text, "current"),
-                  snapshot(edited, "profile-proposal"),
-                  "DataRaft: proposed sample columns",
-                )
-                .then(undefined, (error: unknown) => {
-                  if (proposal === displayedProposal) {
-                    proposal = undefined;
-                    update();
-                  }
-                  void vscode.window.showErrorMessage(
-                    error instanceof Error
-                      ? error.message
-                      : "Could not open the preview diff.",
+              if (message.type === "diff") {
+                await showSavedDiff(document);
+                return;
+              }
+              if (message.type === "profile") {
+                const captured = {
+                  text: document.getText(),
+                  version: document.version,
+                  diskHash: diskBaseline,
+                };
+                const response = await vscode.commands.executeCommand<
+                  Envelope | undefined
+                >("dataraft.profile");
+                if (!response || response.error || response.kind !== "profile")
+                  return;
+                const choices = profileColumnProposals(
+                  captured.text,
+                  response.data,
+                ).map((item) => ({
+                  label: item.name,
+                  description: item.detail,
+                  operation: item.operation,
+                  picked: false,
+                }));
+                if (!choices.length) {
+                  void vscode.window.showInformationMessage(
+                    "No supported column changes were found in this sample.",
                   );
+                  return;
+                }
+                const selected = await vscode.window.showQuickPick(choices, {
+                  canPickMany: true,
+                  title: "Select inferred columns to preview",
+                  placeHolder:
+                    "Choose explicitly; required flags reflect this sample only.",
                 });
-              return;
-            }
-            if (message.type === "validate" || message.type === "sample") {
-              if (document.isDirty || document.uri.scheme !== "file")
-                throw new Error(
-                  "Save the YAML document explicitly before requesting R validation.",
-                );
-              const captured = {
-                text: document.getText(),
-                version: document.version,
-                diskHash: diskBaseline,
-              };
-              const before = contentHash(await diskText(document.uri));
-              assertSnapshot(captured, {
-                text: document.getText(),
-                version: document.version,
-                diskHash: before,
-              });
-              if (before !== contentHash(captured.text))
-                throw new Error(
-                  "The saved file differs from this document. Reconcile it before checking a sample.",
-                );
-              const response = await vscode.commands.executeCommand<
-                Envelope | undefined
-              >(
-                message.type === "validate"
-                  ? "dataraft.validateContract"
-                  : "dataraft.sampleQuality",
-                document.uri,
-              );
-              if (
-                message.type === "sample" &&
-                response &&
-                !response.error &&
-                response.kind === "sample_quality"
-              ) {
-                const after = contentHash(await diskText(document.uri));
+                if (!selected?.length) return;
+                const currentDisk = contentHash(await diskText(document.uri));
                 assertSnapshot(captured, {
                   text: document.getText(),
                   version: document.version,
-                  diskHash: after,
+                  diskHash: currentDisk,
                 });
-                sampleIssues = sampleRuleIssues(captured.text, response.data);
+                const edited = editContract(
+                  captured.text,
+                  selected.map((item) => item.operation),
+                );
+                proposal = { ...captured, edited };
                 update();
-                if (!sampleIssues.length)
-                  void vscode.window.showInformationMessage(
-                    "No failed sample checks could be mapped to unique explicit YAML rule names. Review the quality response for all results.",
-                  );
+                // Displaying immutable snapshots must not lock enabled Apply/Discard
+                // controls while the editor host is still opening the diff tab.
+                const displayedProposal = proposal;
+                void vscode.commands
+                  .executeCommand(
+                    "vscode.diff",
+                    snapshot(captured.text, "current"),
+                    snapshot(edited, "profile-proposal"),
+                    "DataRaft: proposed sample columns",
+                  )
+                  .then(undefined, (error: unknown) => {
+                    if (proposal === displayedProposal) {
+                      proposal = undefined;
+                      update();
+                    }
+                    void vscode.window.showErrorMessage(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not open the preview diff.",
+                    );
+                  });
+                return;
               }
-              return;
-            }
-            if (message.type === "discard") {
-              proposal = undefined;
-              update();
-              return;
-            }
-            if (message.type === "preview") {
-              const text = document.getText(),
-                version = document.version;
-              const edited = editContract(
-                text,
-                message.operations as Operation[],
-              );
-              const currentDisk = contentHash(await diskText(document.uri));
-              assertSnapshot(
-                { text, version, diskHash: diskBaseline },
-                {
+              if (message.type === "validate" || message.type === "sample") {
+                if (document.isDirty || document.uri.scheme !== "file")
+                  throw new Error(
+                    "Save the YAML document explicitly before requesting R validation.",
+                  );
+                const captured = {
+                  text: document.getText(),
+                  version: document.version,
+                  diskHash: diskBaseline,
+                };
+                const before = contentHash(await diskText(document.uri));
+                assertSnapshot(captured, {
+                  text: document.getText(),
+                  version: document.version,
+                  diskHash: before,
+                });
+                if (before !== contentHash(captured.text))
+                  throw new Error(
+                    "The saved file differs from this document. Reconcile it before checking a sample.",
+                  );
+                const response = await vscode.commands.executeCommand<
+                  Envelope | undefined
+                >(
+                  message.type === "validate"
+                    ? "dataraft.validateContract"
+                    : "dataraft.sampleQuality",
+                  document.uri,
+                );
+                if (
+                  message.type === "sample" &&
+                  response &&
+                  !response.error &&
+                  response.kind === "sample_quality"
+                ) {
+                  const after = contentHash(await diskText(document.uri));
+                  assertSnapshot(captured, {
+                    text: document.getText(),
+                    version: document.version,
+                    diskHash: after,
+                  });
+                  sampleIssues = sampleRuleIssues(captured.text, response.data);
+                  update();
+                  if (!sampleIssues.length)
+                    void vscode.window.showInformationMessage(
+                      "No failed sample checks could be mapped to unique explicit YAML rule names. Review the quality response for all results.",
+                    );
+                }
+                return;
+              }
+              if (message.type === "discard") {
+                proposal = undefined;
+                update();
+                return;
+              }
+              if (message.type === "preview") {
+                const text = document.getText(),
+                  version = document.version;
+                const edited = editContract(
+                  text,
+                  message.operations as Operation[],
+                );
+                const currentDisk = contentHash(await diskText(document.uri));
+                assertSnapshot(
+                  { text, version, diskHash: diskBaseline },
+                  {
+                    text: document.getText(),
+                    version: document.version,
+                    diskHash: currentDisk,
+                  },
+                );
+                proposal = { text, version, diskHash: currentDisk, edited };
+                update();
+                // The proposal is complete; opening its immutable diff is not a
+                // document mutation and must not block subsequent button actions.
+                const displayedProposal = proposal;
+                void vscode.commands
+                  .executeCommand(
+                    "vscode.diff",
+                    snapshot(text, "current"),
+                    snapshot(edited, "proposed"),
+                    "DataRaft: proposed YAML edit",
+                  )
+                  .then(undefined, (error: unknown) => {
+                    if (proposal === displayedProposal) {
+                      proposal = undefined;
+                      update();
+                    }
+                    void vscode.window.showErrorMessage(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not open the preview diff.",
+                    );
+                  });
+              } else if (message.type === "apply") {
+                if (!proposal)
+                  throw new Error("Preview an edit before applying it.");
+                const pending = proposal;
+                const currentDisk = contentHash(await diskText(document.uri));
+                assertSnapshot(pending, {
                   text: document.getText(),
                   version: document.version,
                   diskHash: currentDisk,
-                },
-              );
-              proposal = { text, version, diskHash: currentDisk, edited };
-              update();
-              // The proposal is complete; opening its immutable diff is not a
-              // document mutation and must not block subsequent button actions.
-              const displayedProposal = proposal;
-              void vscode.commands
-                .executeCommand(
-                  "vscode.diff",
-                  snapshot(text, "current"),
-                  snapshot(edited, "proposed"),
-                  "DataRaft: proposed YAML edit",
-                )
-                .then(undefined, (error: unknown) => {
-                  if (proposal === displayedProposal) {
-                    proposal = undefined;
-                    update();
-                  }
-                  void vscode.window.showErrorMessage(
-                    error instanceof Error
-                      ? error.message
-                      : "Could not open the preview diff.",
-                  );
                 });
-            } else if (message.type === "apply") {
-              if (!proposal)
-                throw new Error("Preview an edit before applying it.");
-              const pending = proposal;
-              const currentDisk = contentHash(await diskText(document.uri));
-              assertSnapshot(pending, {
-                text: document.getText(),
-                version: document.version,
-                diskHash: currentDisk,
-              });
-              const edit = new vscode.WorkspaceEdit();
-              edit.replace(
-                document.uri,
-                new vscode.Range(
-                  document.positionAt(0),
-                  document.positionAt(pending.text.length),
-                ),
-                pending.edited,
-              );
-              // Do not await between the final version check and submitting the edit.
-              // applyEdit captures the open document version and refuses stale edits.
-              if (!(await vscode.workspace.applyEdit(edit)))
-                throw new Error(
-                  "The editor refused the edit because the document changed. Preview again.",
+                const edit = new vscode.WorkspaceEdit();
+                edit.replace(
+                  document.uri,
+                  new vscode.Range(
+                    document.positionAt(0),
+                    document.positionAt(pending.text.length),
+                  ),
+                  pending.edited,
                 );
-              proposal = undefined;
-              update();
+                // Do not await between the final version check and submitting the edit.
+                // applyEdit captures the open document version and refuses stale edits.
+                if (!(await vscode.workspace.applyEdit(edit)))
+                  throw new Error(
+                    "The editor refused the edit because the document changed. Preview again.",
+                  );
+                proposal = undefined;
+                update();
+              }
+            } catch (error) {
+              void vscode.window.showErrorMessage(
+                error instanceof Error
+                  ? error.message
+                  : "The YAML edit could not be completed.",
+              );
+            } finally {
+              pendingCommands--;
             }
-          } catch (error) {
-            void vscode.window.showErrorMessage(
-              error instanceof Error
-                ? error.message
-                : "The YAML edit could not be completed.",
-            );
-          } finally {
-            busy = false;
-          }
+          });
+          // Keep the queue usable even if an unexpected host callback rejects.
+          commands = next.catch(() => {});
+          return next;
         }),
       ];
       panel.onDidDispose(() => {
+        disposed = true;
         proposal = undefined;
         disposables.forEach((disposable) => disposable.dispose());
         diagnostics.delete(document.uri);
