@@ -7,6 +7,7 @@ await build({
     "src/render.ts",
     "src/contract-document.ts",
     "src/contract-editor.ts",
+    "src/rule-diagnostics.ts",
   ],
   bundle: true,
   platform: "node",

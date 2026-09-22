@@ -20,6 +20,7 @@ import {
 import { MetadataNode, MetadataTree } from "./tree";
 import { lineageHtml } from "./render";
 import { registerYamlEditor } from "./contract-editor";
+import { RuleDiagnostics, RuleLocation } from "./rule-diagnostics";
 export function activate(context: vscode.ExtensionContext): void {
   const api = tryAcquirePositronApi();
   const controller = new Controller(context, api);
@@ -39,6 +40,8 @@ class Controller implements vscode.Disposable {
   private views = new Map<string, vscode.TreeView<MetadataNode>>();
   private transport: BridgeTransport;
   private pendingRequests = new Set<AbortController>();
+  private ruleDiagnostics = new RuleDiagnostics();
+  private diagnosticsGeneration = 0;
   private disposables: vscode.Disposable[] = [];
   constructor(
     private context: vscode.ExtensionContext,
@@ -106,6 +109,10 @@ class Controller implements vscode.Disposable {
     command("openMetadata", () => this.openMetadata());
     command("inspect", (node?: MetadataNode) => this.inspect(node));
     command("trial", (node?: MetadataNode) => this.trial(node));
+    command("showRuleDiagnostics", (node?: MetadataNode) =>
+      this.showRuleDiagnostics(node),
+    );
+    this.disposables.push(this.ruleDiagnostics);
     command("view", (node?: MetadataNode) => this.viewRows(node));
     command("lineage", (node?: MetadataNode) => this.lineage(node));
     command("reports", () => this.reports());
@@ -219,8 +226,13 @@ class Controller implements vscode.Disposable {
     this.clear();
     await this.refresh();
   }
+  private clearRuleDiagnostics(): void {
+    this.diagnosticsGeneration++;
+    this.ruleDiagnostics.clear();
+  }
   private clear(): void {
     this.generation++;
+    this.clearRuleDiagnostics();
     for (const request of this.pendingRequests) request.abort();
     this.snapshots.clear();
     this.details.clear();
@@ -265,7 +277,9 @@ class Controller implements vscode.Disposable {
           const response = await this.transport.request(
             id,
             {
-              context: contextHandle,
+              ...(input.operation === "diagnostics"
+                ? {}
+                : { context: contextHandle }),
               limit: config.get<number>("maximumItems", 100),
               ...input,
             },
@@ -306,6 +320,7 @@ class Controller implements vscode.Disposable {
     );
   }
   private async refresh(): Promise<void> {
+    this.clearRuleDiagnostics();
     if (this.offline) {
       await this.loadOffline(this.offline);
       return;
@@ -424,6 +439,47 @@ class Controller implements vscode.Disposable {
     await this.json(
       response,
       "Trial completed. No configured target was published.",
+    );
+  }
+  private async showRuleDiagnostics(node?: MetadataNode): Promise<void> {
+    const selected = await this.pickProduct(node);
+    if (!selected?.product) return;
+    if (
+      this.offline ||
+      selected.product.kind !== "result" ||
+      !selected.product.handle.startsWith("result:")
+    )
+      throw new Error(
+        "Select a retained trial result in the current R session. Trial the product first.",
+      );
+    this.clearRuleDiagnostics();
+    const generation = this.generation;
+    const request = this.diagnosticsGeneration;
+    const response = await this.request({
+      version: 2,
+      operation: "diagnostics",
+      handle: selected.product.handle,
+    });
+    if (
+      request !== this.diagnosticsGeneration ||
+      generation !== this.generation
+    )
+      return;
+    const data = response.data as { items: RuleLocation[]; truncated: boolean };
+    const counts = await this.ruleDiagnostics.show(
+      data.items,
+      () =>
+        request === this.diagnosticsGeneration &&
+        generation === this.generation &&
+        vscode.workspace.isTrusted,
+    );
+    if (
+      request !== this.diagnosticsGeneration ||
+      generation !== this.generation
+    )
+      return;
+    vscode.window.showInformationMessage(
+      `${counts.shown} R rule diagnostic(s) shown. ${counts.omitted} location(s) omitted because the source is unavailable, changed or outside this workspace.${data.truncated ? " The result was truncated." : ""}${data.items.length === 0 ? " No verified function source locations are available for this result." : ""}`,
     );
   }
   private async viewRows(node?: MetadataNode): Promise<void> {

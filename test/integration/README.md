@@ -3,7 +3,7 @@
 Run `npm run test:integration` from the extension repository after installing its
 Node dependencies and these R packages:
 
-- `dataraft.core`, `dataraft.lake`, `dataraft.catalog`, `dataraft.adapters`, `dataraft.ide`
+- `dataraft.core`, `dataraft.lake`, `dataraft.catalog`, `dataraft.adapters`, and v2-capable `dataraft.ide` (>= 0.1.0.9001)
 - `duckdb`, `bit64`, `dm`, `yaml`, and their package dependencies
 
 The command starts a real persistent R subprocess. It fails if R or a required
@@ -28,9 +28,9 @@ the same process, its quality evidence is fetched, and a binding is changed
 before the next metadata request. Sensitive synthetic table values and source
 text must never appear in response metadata. Temporary resources are removed.
 
-The test validates **25 responses in the same R process**: the original 18
-metadata, trial, profile and changed-binding responses plus seven contract and
-recovery responses. The additional checks exercise actual behavior:
+The test validates **28 responses in the same R process**: the original 18
+metadata, trial, profile and changed-binding responses, seven contract and
+recovery responses, and three explicit R-source diagnostics responses. The additional checks exercise actual behavior:
 
 - Export a saved ODCS contract with `dr_contract_odcs()` and validate its id,
   version and column types through `validate_contract`.
@@ -50,3 +50,10 @@ There are no hand-written quality results, mocks of R handlers, or skip branches
 
 This verifies the R/file/Node boundary, not the Positron GUI or its runtime
 session selection API. The test does not invoke the GUI data viewer.
+
+The v2 cases source an actual function rule with `keep.source = TRUE`, trial a
+failing delivery, and request diagnostics for the retained result. The response
+must have the exact file SHA-256 and source range, using the independent v2
+schema. Editing the source file after the trial must yield no diagnostics. The
+following ordinary products request still validates against the unchanged v1
+schema, proving that v2 does not silently replace existing metadata operations.

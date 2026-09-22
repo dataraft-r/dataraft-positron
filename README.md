@@ -27,6 +27,8 @@ Refresh is manual. Expanding an uncached product requests its detail. No backgro
 
 **Open Contract YAML Editor** edits ODCS 3.2 YAML as the authoritative document. Edits preserve comments and unknown metadata. The editor proposes a diff before applying a version-checked workspace edit, which remains unsaved for your review. Dirty buffers and external changes invalidate pending edits. Diagnostics point to parsed YAML source ranges. The portable `dr_contract_yaml()` metadata export is not an executable ODCS contract.
 
+The saved-file baseline comes from opening the editor and explicit saves. If another program changes the file, preserve any unsaved work and review those external changes, then close and reopen the contract editor before previewing further edits. Reopening establishes a fresh disk baseline; the extension does not automatically save over the changed file.
+
 **Validate Saved ODCS Contract in R** uses `dr_contract_from_odcs()` against the saved file. **Profile Selected Workspace Table** shows inferred schema metadata; **Check Bounded Table Sample against Saved Contract** explicitly checks a bounded in-memory sample and returns counts. Neither command transfers table cells. Sampling does not establish full-dataset quality.
 
 ## VS Code and remote workspaces
@@ -37,7 +39,7 @@ This is a workspace extension: in Positron Workbench or a remote workspace, inst
 
 ## Transport and limits
 
-The bridge contract is numeric version 1. The extension sends base64-encoded JSON to `dataraft.ide::ide_request()` using the selected R console session ID. It ignores `executeCode()` results and never parses console output or R source. An atomic response file in a private temporary directory carries a matching request ID and exact metadata DTOs. Requests are serialized; cancellation/disposal prevents queued extension requests from dispatching. Timeout or cancellation stops waiting, but R work already queued may still finish.
+Existing metadata, trial and viewer requests use numeric protocol version 1. Only **Show R Rule Diagnostics** explicitly opts into version 2. The extension sends base64-encoded JSON to `dataraft.ide::ide_request()` using the selected R console session ID. It ignores `executeCode()` results and never parses console output or evaluates R source. An atomic response file in a private temporary directory carries a matching request ID and exact metadata DTOs. Requests are serialized; cancellation/disposal prevents queued extension requests from dispatching. Timeout or cancellation stops waiting, but R work already queued may still finish.
 
 Requests are limited to 16 KiB and responses to 1 MiB. Symlinks, unexpected DTO fields, invalid versions and stale request IDs are rejected. Metadata text may itself be sensitive; share snapshots deliberately. The bridge is not a sandbox for user transforms or a defense against another process running as the same OS user.
 
@@ -49,6 +51,14 @@ The test layers exercise different boundaries:
 
 - `npm test` compiles TypeScript and runs Node tests. Real controller code uses an isolated VS Code/Positron API double to check R console filtering, cancelled selection, vanished/busy/untrusted sessions, session switches at asynchronous boundaries, explicit Trial and bounded View, stale responses and recovery. Transport tests use actual temporary files and atomic renames, including malformed responses, cancellation, queue recovery and cleanup. YAML tests cover AST preservation, conflict checks, sample profiling and diagnostic source ranges.
 - `npm run test:integration` uses a real persistent R process and the actual bridge package to validate metadata and execution evidence across multiple requests. See `test/integration/README.md` for prerequisites.
-- `npm run test:host` requires a graphical environment or Xvfb and uses the pinned VS Code 1.96.4 extension host. It checks every declared command and the real YAML custom-editor lifecycle: document edits, diagnostics, an unsaved-versus-saved diff and explicit save. It does not simulate a Positron runtime or exercise webview button clicks.
+- `npm run test:host` requires a graphical environment or Xvfb and uses the pinned VS Code 1.96.4 extension host. It checks every declared command and the real YAML custom-editor lifecycle: document edits, diagnostics, an unsaved-versus-saved diff and explicit save. A Playwright CDP client drives the production webview inside that Electron host: it fills a contract field and clicks Preview, Discard and Apply, checks that Apply leaves YAML unsaved, and verifies that a concurrent text edit invalidates the pending preview. The loopback debugging port is allocated only by the test runner; no production test hook is installed. It does not simulate a Positron runtime.
 
-A real Positron session is still needed to verify R console selection and the R data viewer in the application. Neither the Node tests nor the VS Code host tests establish that GUI coverage.
+A real Positron session is still needed to verify R console selection and the R data viewer in the application. Neither the Node tests nor the VS Code host tests establish that GUI coverage. Follow the [manual Positron acceptance guide](docs/positron-acceptance.md) for that remaining boundary.
+
+## R rule diagnostics
+
+After an explicit Trial, select its retained result and run **Show R Rule Diagnostics**. This command requires a v2-capable `dataraft.ide`; older bridges produce an upgrade message while existing v1 features remain usable. It does not rerun the product.
+
+Only function rules loaded with `source(..., keep.source = TRUE)` can provide verified R source references. Formula locations are unavailable. The bridge snapshots source hashes before the trial; the extension accepts only unchanged UTF-8 files of at most one MiB inside the current workspace, with valid zero-based UTF-16 ranges. Dirty or stale editor buffers, changed files, outside-workspace paths and invalid ranges receive no markers. Diagnostic messages contain the rule identifier and status, without failure rows or condition text.
+
+Markers clear on document edits, external changes to mapped files, refresh, session/context changes and extension disposal. A summary reports omitted locations; absent locations do not imply that rules passed. No source locations or paths are added to v1 responses.

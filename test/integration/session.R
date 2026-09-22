@@ -63,6 +63,13 @@ yaml::write_yaml(odcs, file.path(root, "sample.contract.yaml"))
 odcs$schema[[1L]]$quality[[1L]]$implementation$predicate <-
   'system("CONTRACT_SOURCE_MUST_NOT_LEAK")'
 yaml::write_yaml(odcs, file.path(root, "invalid.contract.yaml"))
+# A true srcref-backed function rule; source contents never cross the bridge.
+rule_file <- file.path(root, "rule-source.R")
+writeLines(c("# Unicode source: 雪", "positive <- function(data) data$amount >= 0"), rule_file, useBytes = TRUE)
+rule_environment <- new.env(parent = baseenv())
+source(rule_file, local = rule_environment, keep.source = TRUE, encoding = "UTF-8")
+workspace$diagnostic_product <- dr_product("diagnostic.orders", data.frame(amount = -1)) |>
+  dr_add_quality(dr_quality_rule(rule_environment$positive, name = "positive"))
 context <- ide_context(workspace)
 
 input <- file("stdin", open = "r")

@@ -1,6 +1,7 @@
 import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import bridgeSchema from "../schemas/bridge-v1.json";
+import diagnosticsSchema from "../schemas/bridge-v2.json";
 export const CONTRACT = 1 as const;
 export const OPERATIONS = [
   "contexts",
@@ -19,7 +20,7 @@ export const OPERATIONS = [
   "validate_contract",
   "sample_quality",
 ] as const;
-export type Operation = (typeof OPERATIONS)[number];
+export type Operation = (typeof OPERATIONS)[number] | "diagnostics";
 export type Scalar = string | number | boolean | null;
 export type RecordRow = Record<string, Scalar>;
 export interface Product {
@@ -61,7 +62,7 @@ export interface Graph {
   truncated: boolean;
 }
 export interface Envelope {
-  contract: typeof CONTRACT;
+  contract: typeof CONTRACT | 2;
   generated: string;
   kind: Operation | "error";
   request_id: string | null;
@@ -69,7 +70,7 @@ export interface Envelope {
   error: null | { code: string; message: string };
 }
 export interface Request {
-  version: 1;
+  version: 1 | 2;
   request_id: string;
   response_path: string;
   operation: Operation;
@@ -86,6 +87,7 @@ const ajv = new Ajv2020({
 });
 addFormats(ajv);
 const validateSchema = ajv.compile(bridgeSchema);
+const validateDiagnosticsSchema = ajv.compile(diagnosticsSchema);
 function reject(): never {
   throw new Error("Invalid or unsupported DataRaft metadata response.");
 }
@@ -107,10 +109,14 @@ function enforceBounds(value: unknown): void {
 }
 export function validateEnvelope(
   value: unknown,
-  expected?: { requestId: string; operation: Operation },
+  expected?: { requestId: string; operation: Operation; version?: 1 | 2 },
 ): Envelope {
   enforceBounds(value);
-  if (!validateSchema(value)) reject();
+  const version = (value as { contract?: unknown } | null)?.contract;
+  if (
+    version === 2 ? !validateDiagnosticsSchema(value) : !validateSchema(value)
+  )
+    reject();
   const response = value as unknown as Envelope;
   if (!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(response.generated)) reject();
   if (
@@ -119,6 +125,15 @@ export function validateEnvelope(
       (response.kind !== expected.operation && response.kind !== "error"))
   ) {
     throw new Error("DataRaft response does not match the active request.");
+  }
+  if (expected && response.contract !== (expected.version ?? 1)) {
+    if (expected.version === 2 && response.contract === 1 && response.error)
+      throw new Error(
+        "R rule diagnostics require dataraft.ide with protocol v2. Update the R bridge package and retry.",
+      );
+    throw new Error(
+      "DataRaft response protocol does not match the active request.",
+    );
   }
   if (response.kind === "lineage" && !response.error) {
     const graph = response.data as Graph;
