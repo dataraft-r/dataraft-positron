@@ -24,7 +24,7 @@ install.packages(c(
 # Minimal integration subset of the merged umbrella family-lock.json.
 # Explicit refs preserve the tested combination without following main.
 refs <- c(
-  dataraft.core = "6edadf92d570742bcb428bef5aa83f0c6d7b0198",
+  dataraft.core = "871982715c6000c8f1018456576e6cd517a5b7a6",
   dataraft.lake = "7462a326a1cb65280795cc89217d72b1b9a69d22",
   dataraft.adapters = "2c770354c67476919e534c6bfe82682e51c1bf51",
   dataraft.catalog = "11c1f5f3705f83d609250a6c954012a2b430ad75",
