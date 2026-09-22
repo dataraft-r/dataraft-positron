@@ -144,6 +144,10 @@ exports.run = async () => {
   let page;
   let context;
   const completed = [];
+  const checkpoint = (journey) => {
+    completed.push(journey);
+    console.log("Native Positron PASS:", journey);
+  };
   try {
     page = await until(async () => {
       for (const candidate of browser
@@ -245,7 +249,7 @@ exports.run = async () => {
         ),
       "product tree inspection JSON",
     );
-    completed.push("session selection, refresh and product tree inspection");
+    checkpoint("session selection, refresh and product tree inspection");
 
     for (const [id, status] of [
       ["passing.orders", "completed"],
@@ -263,7 +267,7 @@ exports.run = async () => {
       );
       assert.equal(result.data.status, status);
       assert.match(result.data.handle, /^result:/);
-      completed.push(`${id}: ${status}`);
+      checkpoint(`${id}: ${status}`);
     }
     await idle();
     await refresh();
@@ -285,7 +289,7 @@ exports.run = async () => {
     );
     assert.equal(quality.n_failed, 1);
     assert.equal(quality.n_total, 2);
-    completed.push("quality tree reports one failure in two rows");
+    checkpoint("quality tree reports one failure in two rows");
 
     await idle();
     await command("Show R Rule Diagnostics");
@@ -305,7 +309,7 @@ exports.run = async () => {
     await page.screenshot({
       path: path.join(artifacts, "rule-diagnostic.png"),
     });
-    completed.push(
+    checkpoint(
       "function srcref diagnostic maps to actual workspace R file",
     );
 
@@ -327,7 +331,7 @@ exports.run = async () => {
     await page.screenshot({
       path: path.join(artifacts, "bounded-data-explorer.png"),
     });
-    completed.push("Ark View opens native Data Explorer with 3 of 20 rows");
+    checkpoint("Ark View opens native Data Explorer with 3 of 20 rows");
 
     await idle();
     await command("Show Directed Lineage");
@@ -352,9 +356,31 @@ exports.run = async () => {
       .filter({ hasText: "passing.orders" })
       .first()
       .waitFor();
-    completed.push(
+    checkpoint(
       "lineage node click reveals corresponding product tree item",
     );
+
+    // Revealing/expanding the lineage target loads detail asynchronously.
+    // An explicit user inspection provides a completion boundary before the
+    // next editor journey, rather than treating selection as request completion.
+    const previousDocument =
+      vscode.window.activeTextEditor?.document.uri.toString();
+    await page
+      .getByRole("treeitem", { selected: true })
+      .filter({ hasText: "passing.orders" })
+      .first()
+      .click();
+    await until(async () => {
+      if (
+        vscode.window.activeTextEditor?.document.uri.toString() ===
+        previousDocument
+      )
+        return false;
+      return currentJson(
+        (value) => value.id === "passing.orders" && value.kind === "product",
+      );
+    }, "lineage target inspection completed in a new JSON document");
+    await idle();
 
     const yamlUri = vscode.Uri.file(
       path.join(workspace, "native.contract.yaml"),
@@ -366,8 +392,21 @@ exports.run = async () => {
     const document = await vscode.workspace.openTextDocument(yamlUri);
     await vscode.window.showTextDocument(document);
     await command("Open Contract YAML Editor");
-    await require("./host-webview.cjs").exerciseWebview(document);
-    completed.push(
+    await until(
+      () =>
+        vscode.window.tabGroups.all
+          .flatMap((group) => group.tabs)
+          .some(
+            (tab) =>
+              tab.isActive &&
+              tab.input instanceof vscode.TabInputCustom &&
+              tab.input.viewType === "dataraft.contractYaml" &&
+              tab.input.uri.toString() === yamlUri.toString(),
+          ),
+      "active production custom-editor tab for the exact YAML document",
+    );
+    await require("./host-webview.cjs").exerciseWebview(document, browser);
+    checkpoint(
       "native webview buttons preview, discard, apply and reject stale YAML edits",
     );
     assert.ok(
@@ -380,7 +419,48 @@ exports.run = async () => {
       JSON.stringify({ sessionId, completed }, null, 2),
     );
   } catch (error) {
+    console.error(
+      "Native Positron completed journeys:",
+      JSON.stringify(completed),
+    );
+    console.error("Native Positron failure:", String(error.stack || error));
+    console.error(
+      "Native Positron editor tabs:",
+      JSON.stringify(
+        vscode.window.tabGroups.all
+          .flatMap((group) => group.tabs)
+          .slice(0, 30)
+          .map((tab) => ({
+            label: tab.label,
+            active: tab.isActive,
+            viewType: tab.input?.viewType,
+            uri: tab.input?.uri?.toString(),
+          })),
+      ),
+    );
     if (page) {
+      // This runner owns an isolated synthetic workspace. Keep CI diagnostics
+      // bounded so a failed selector is debuggable without downloading a trace.
+      const visibleState = await page
+        .evaluate(() => ({
+          alerts: [
+            ...document.querySelectorAll(
+              '[role="alert"], .notifications-toasts .notification-list-item',
+            ),
+          ]
+            .slice(0, 12)
+            .map((element) => (element.innerText || "").slice(0, 500)),
+          workbench: (
+            document.querySelector(".monaco-workbench")?.innerText || ""
+          ).slice(-10000),
+        }))
+        .catch((captureError) => ({
+          unavailable: String(captureError.message).slice(0, 500),
+        }));
+      console.error(
+        "Native Positron visible state:",
+        JSON.stringify(visibleState),
+      );
       await page
         .screenshot({
           path: path.join(artifacts, "failure.png"),

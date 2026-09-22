@@ -66,12 +66,16 @@ async function frameLocator(page, frame) {
   return current;
 }
 
-exports.exerciseWebview = async (document) => {
+exports.exerciseWebview = async (document, existingBrowser) => {
   const port = Number(process.env.DATARAFT_HOST_CDP_PORT);
   assert.ok(Number.isInteger(port) && port > 0, "Host CDP port is required");
-  const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, {
-    timeout: 15000,
-  });
+  // Native Positron already tracks the workbench and its out-of-process
+  // webviews. Reuse that client rather than attaching a second target graph.
+  const browser =
+    existingBrowser ||
+    (await chromium.connectOverCDP(`http://127.0.0.1:${port}`, {
+      timeout: 15000,
+    }));
   for (const context of browser.contexts()) context.setDefaultTimeout(15000);
   try {
     const visibleEditor = async () => {
@@ -275,6 +279,6 @@ exports.exerciseWebview = async (document) => {
     throw error;
   } finally {
     // Disconnect this CDP client; the existing extension-host runner owns VS Code.
-    await browser.close();
+    if (!existingBrowser) await browser.close();
   }
 };
