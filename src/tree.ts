@@ -178,7 +178,14 @@ export class MetadataTree implements vscode.TreeDataProvider<MetadataNode> {
     const appearance =
       status && ["blocked", "failed", "fail", "error"].includes(status)
         ? ["error", "testing.iconFailed"]
-        : status && ["warn", "warning", "degraded"].includes(status)
+        : status &&
+            [
+              "warn",
+              "warning",
+              "degraded",
+              "unvalidated",
+              "not_checked",
+            ].includes(status)
           ? ["warning", "list.warningForeground"]
           : status &&
               [

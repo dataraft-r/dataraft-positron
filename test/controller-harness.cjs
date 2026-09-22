@@ -63,8 +63,17 @@ async function harness(t) {
       fire() {}
       dispose() {}
     },
-    ThemeIcon: class {},
-    ThemeColor: class {},
+    ThemeIcon: class {
+      constructor(id, color) {
+        this.id = id;
+        this.color = color;
+      }
+    },
+    ThemeColor: class {
+      constructor(id) {
+        this.id = id;
+      }
+    },
     TreeItem: class {},
     TreeItemCollapsibleState: { Collapsed: 1, None: 0 },
     ProgressLocation: { Notification: 15 },

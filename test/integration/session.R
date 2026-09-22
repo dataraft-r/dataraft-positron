@@ -28,7 +28,8 @@ workspace$workflow <- dr_workflow() |>
   dr_add_source(function() stop("SOURCE_BODY_MUST_NOT_LEAK"))
 workspace$model <- dr_product(
   "portfolio",
-  dm::dm(customers = data.frame(id = 1:2))
+  dm::dm(customers = data.frame(id = 1:2)),
+  contracts = list(customers = dr_contract("customers.contract", columns = c(id = "integer")))
 )
 makeActiveBinding(
   "active",
@@ -68,9 +69,10 @@ rule_file <- file.path(root, "rule-source.R")
 writeLines(c("# Unicode source: 雪", "positive <- function(data) data$amount >= 0"), rule_file, useBytes = TRUE)
 rule_environment <- new.env(parent = baseenv())
 source(rule_file, local = rule_environment, keep.source = TRUE, encoding = "UTF-8")
-workspace$diagnostic_product <- dr_product("diagnostic.orders", data.frame(amount = -1)) |>
+workspace$diagnostic_product <- dr_product("diagnostic.orders", data.frame(amount = -1),
+  contract = dr_contract("diagnostic.contract", columns = c(amount = "numeric"))) |>
   dr_add_quality(dr_quality_rule(rule_environment$positive, name = "positive"))
-context <- ide_context(workspace, response_root = root)
+context <- ide_context(workspace, response_root = root, read_roots = root)
 
 input <- file("stdin", open = "r")
 repeat {

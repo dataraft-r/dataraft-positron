@@ -3,8 +3,10 @@ library(dataraft.core)
 library(dataraft.ide)
 source(file.path(native_root, "native-rule.R"), keep.source = TRUE, encoding = "UTF-8")
 passing_orders <- dr_product(
-  "passing.orders", data.frame(id = seq_len(20L), amount = as.numeric(seq_len(20L)))
+  "passing.orders", data.frame(id = seq_len(20L), amount = as.numeric(seq_len(20L))),
+  contract = dr_contract("passing.contract", columns = c(id = "integer", amount = "numeric"))
 ) |> dr_add_quality(dr_quality_rule(native_nonnegative, name = "nonnegative"))
 failing_orders <- dr_product(
-  "failing.orders", data.frame(id = 1:2, amount = c(-1, 2))
+  "failing.orders", data.frame(id = 1:2, amount = c(-1, 2)),
+  contract = dr_contract("failing.contract", columns = c(id = "integer", amount = "numeric"))
 ) |> dr_add_quality(dr_quality_rule(native_nonnegative, name = "nonnegative"))

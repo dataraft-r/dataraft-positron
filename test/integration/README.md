@@ -3,7 +3,7 @@
 Run `npm run test:integration` from the extension repository after installing its
 Node dependencies and these R packages:
 
-- `dataraft.core`, `dataraft.lake`, `dataraft.catalog`, `dataraft.adapters`, and diagnostics-capable `dataraft.ide` (>= 0.1.0.9003)
+- `dataraft.core`, `dataraft.lake`, `dataraft.catalog`, `dataraft.adapters`, and diagnostics-capable `dataraft.ide` (>= 0.1.0.9004)
 - `duckdb`, `bit64`, `dm`, `yaml`, and their package dependencies
 
 The command starts a real persistent R subprocess. It fails if R or a required
@@ -28,7 +28,7 @@ the same process, its quality evidence is fetched, and a binding is changed
 before the next metadata request. Sensitive synthetic table values and source
 text must never appear in response metadata. Temporary resources are removed.
 
-The test validates **28 responses in the same R process**: the original 18
+The test validates **30 responses in the same R process**: the original 18
 metadata, trial, profile and changed-binding responses, seven contract and
 recovery responses, and three explicit R-source diagnostics responses. The additional checks exercise actual behavior:
 
@@ -56,3 +56,6 @@ failing delivery, and request diagnostics for the retained result. The response
 must have the exact file SHA-256 and source range, using the independent diagnostics-channel schema (wire discriminator 2). Editing the source file after the trial must yield no diagnostics. The
 following ordinary products request still validates against the unchanged v1
 schema, proving that diagnostics does not silently replace existing metadata operations.
+
+Contract validation and sample checks also reject existing YAML files outside the
+fixture context’s trusted read root, then successfully validate an allowed file.

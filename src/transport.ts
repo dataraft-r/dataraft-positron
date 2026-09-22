@@ -35,12 +35,13 @@ export class BridgeTransport {
     sessionId: string,
     input: RequestInput,
     signal?: AbortSignal,
+    readRoots: readonly string[] = [],
   ): Promise<Envelope> {
     if (this.disposed)
       return Promise.reject(new Error("DataRaft transport is disposed."));
     const task = this.tail
       .catch(() => undefined)
-      .then(() => this.run(sessionId, input, signal));
+      .then(() => this.run(sessionId, input, signal, readRoots));
     this.tail = task.catch(() => undefined);
     return task;
   }
@@ -52,6 +53,7 @@ export class BridgeTransport {
     sessionId: string,
     input: RequestInput,
     outer?: AbortSignal,
+    readRoots: readonly string[] = [],
   ): Promise<Envelope> {
     if (this.disposed) throw new Error("DataRaft transport is disposed.");
     if (outer?.aborted) throw new Error("DataRaft request cancelled.");
@@ -160,7 +162,7 @@ export class BridgeTransport {
         }
         try {
           const queued = this.dispatch(
-            rBridgeCode(request, directory),
+            rBridgeCode(request, directory, readRoots),
             sessionId,
           );
           Promise.resolve(queued).then(

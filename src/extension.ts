@@ -4,6 +4,7 @@ import {
   PositronApi,
   BaseLanguageRuntimeSession,
 } from "@posit-dev/positron";
+import { dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { BridgeTransport, RequestInput } from "./transport";
 import {
@@ -249,7 +250,10 @@ class Controller implements vscode.Disposable {
       false,
     );
   }
-  private async request(input: RequestInput): Promise<Envelope> {
+  private async request(
+    input: RequestInput,
+    readRoots: readonly string[] = [],
+  ): Promise<Envelope> {
     const generation = this.generation;
     const contextHandle = this.contextHandle;
     const session = await this.session();
@@ -290,6 +294,7 @@ class Controller implements vscode.Disposable {
               ...input,
             },
             abort.signal,
+            readRoots,
           );
           if (response.error)
             throw new Error(
@@ -600,10 +605,13 @@ class Controller implements vscode.Disposable {
     const saved = await this.savedContract(uri);
     if (saved)
       await this.json(
-        await this.request({
-          operation: "validate_contract",
-          file_path: saved.fsPath,
-        }),
+        await this.request(
+          {
+            operation: "validate_contract",
+            file_path: saved.fsPath,
+          },
+          [dirname(saved.fsPath)],
+        ),
       );
   }
   private async profile(): Promise<Envelope | undefined> {
@@ -629,14 +637,17 @@ class Controller implements vscode.Disposable {
       );
     const saved = await this.savedContract(uri);
     if (saved) {
-      const response = await this.request({
-        operation: "sample_quality",
-        handle: selected.product.handle,
-        file_path: saved.fsPath,
-        row_limit: vscode.workspace
-          .getConfiguration("dataraft")
-          .get<number>("maximumRows", 100),
-      });
+      const response = await this.request(
+        {
+          operation: "sample_quality",
+          handle: selected.product.handle,
+          file_path: saved.fsPath,
+          row_limit: vscode.workspace
+            .getConfiguration("dataraft")
+            .get<number>("maximumRows", 100),
+        },
+        [dirname(saved.fsPath)],
+      );
       await this.json(response);
       return response;
     }

@@ -591,3 +591,63 @@ test("response root is a separately encoded trusted R argument", () => {
   );
   assert.ok(!code.includes('system("bad")'));
 });
+
+test("contract authorization is separate from untrusted request paths", () => {
+  const root = '/workspace/雪\");system("bad")#';
+  const request = {
+    version: 1,
+    operation: "validate_contract",
+    request_id: "contract-root",
+    response_path: "/tmp/response.json",
+    file_path: "/outside/secret.yaml",
+  };
+  const denied = rBridgeCode(request, "/tmp/private");
+  assert.match(denied, /read_roots = character\(\)/);
+  const authorized = rBridgeCode(request, "/tmp/private", [root]);
+  assert.deepEqual(decode(authorized), request);
+  const paths = [
+    ...authorized.matchAll(/rawToChar\(as.raw\(c\(([0-9,]+)\)\)\)/g),
+  ].map((match) =>
+    Buffer.from(match[1].split(",").map(Number)).toString("utf8"),
+  );
+  assert.deepEqual(paths, ["/tmp/private", root]);
+  assert.ok(!authorized.includes('system("bad")'));
+  assert.ok(!authorized.includes("/outside/secret.yaml"));
+});
+
+test("transport forwards only separately granted read roots", async () => {
+  const codes = [];
+  const transport = new BridgeTransport(async (code) => {
+    codes.push(code);
+    const req = decode(code);
+    await atomic(
+      req,
+      response(req, "validate_contract", {
+        id: "orders",
+        version: "1.0",
+        columns: [],
+        key: [],
+      }),
+    );
+  });
+  try {
+    const input = {
+      operation: "validate_contract",
+      file_path: "/outside/private.yaml",
+    };
+    await transport.request("session", input);
+    await transport.request("session", input, undefined, [
+      "/trusted/contracts",
+    ]);
+    assert.match(codes[0], /read_roots = character\(\)/);
+    const paths = [
+      ...codes[1].matchAll(/rawToChar\(as.raw\(c\(([0-9,]+)\)\)\)/g),
+    ].map((match) =>
+      Buffer.from(match[1].split(",").map(Number)).toString("utf8"),
+    );
+    assert.equal(paths[1], "/trusted/contracts");
+    assert.equal(paths.length, 2);
+  } finally {
+    transport.dispose();
+  }
+});

@@ -64,7 +64,7 @@ test(
       (code, sessionId) => {
         assert.equal(sessionId, "persistent-r-fixture");
         const match = code.match(
-          /^dataraft\.ide::ide_request\("([A-Za-z0-9+/=]+)", context = dataraft\.ide::ide_context\(response_root = rawToChar\(as.raw\(c\(([0-9,]+)\)\)\)\)\)$/,
+          /^dataraft\.ide::ide_request\("([A-Za-z0-9+/=]+)", context = dataraft\.ide::ide_context\(response_root = rawToChar\(as.raw\(c\(([0-9,]+)\)\)\), read_roots = character\(\)\)\)$/,
         );
         assert.ok(match, "only the fixed encoded R entry point is sent");
         const request = JSON.parse(
@@ -258,6 +258,27 @@ test(
         },
         "execution_failed",
       );
+      const privateDirectory = await mkdtemp(
+        join(tmpdir(), "dataraft-outside-"),
+      );
+      try {
+        const privateFile = join(privateDirectory, "private.yaml");
+        await writeFile(privateFile, "id: PRIVATE_CONTRACT_CONTENT\n");
+        await request(
+          { operation: "validate_contract", file_path: privateFile },
+          "unsafe_path",
+        );
+        await request(
+          {
+            operation: "sample_quality",
+            handle: "binding:sample_rows",
+            file_path: privateFile,
+          },
+          "unsafe_path",
+        );
+      } finally {
+        await rm(privateDirectory, { recursive: true, force: true });
+      }
       const recoveredContract = await request({
         operation: "validate_contract",
         file_path: contractFile,
@@ -323,8 +344,8 @@ test(
       );
       assert.equal(
         responseCount,
-        28,
-        "25 existing responses plus sourced-rule trial, v2 diagnostics and stale-source rejection",
+        30,
+        "28 existing responses plus two rejected out-of-root contract reads",
       );
       t.diagnostic(
         `${responseCount} real R responses passed file transport, canonical JSON Schema and Node protocol checks`,

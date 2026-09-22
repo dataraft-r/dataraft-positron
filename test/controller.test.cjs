@@ -266,3 +266,17 @@ test("deactivation while lineage is pending never opens a late panel", async (t)
   await command;
   assert.equal(h.panels.length, 0);
 });
+
+test("unvalidated products remain visible with warning rather than success styling", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  const products = fixture("products");
+  products.items[0].status = "unvalidated";
+  h.respond = (req) => (req.operation === "products" ? products : empty);
+  await h.command("refresh");
+  const tree = h.views.get("dataraft.products").tree;
+  const item = tree.getTreeItem(tree.roots[0]);
+  assert.match(item.description, /unvalidated/);
+  assert.equal(item.iconPath.id, "warning");
+  assert.equal(item.iconPath.color.id, "list.warningForeground");
+});
