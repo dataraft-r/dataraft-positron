@@ -65,6 +65,7 @@ const graphs = {
 };
 exports.graphs = graphs;
 exports.capture = async function (vscode, page, artifacts, until) {
+  const { frameLocator } = require("./host-webview.cjs");
   const panel = vscode.window.createWebviewPanel(
     "dataraft.visualReview",
     "DataRaft visual review: 12 products",
@@ -89,12 +90,23 @@ exports.capture = async function (vscode, page, artifacts, until) {
         `review${label}`,
       );
       const frame = await until(async () => {
+        // Theme changes replace webview renderer documents. Re-enumerate
+        // frames on each bounded readiness check; never retain a stale Frame.
         for (const candidate of page.frames()) {
-          if (
-            (await candidate.locator(".graph .node").count()) === 12 &&
-            (await candidate.locator(`body.vscode-${label}`).count())
-          )
-            return candidate;
+          try {
+            if (
+              (await candidate.locator(".graph .node").count()) === 12 &&
+              (await candidate.locator(`body.vscode-${label}`).count())
+            )
+              return await frameLocator(page, candidate);
+          } catch (error) {
+            if (
+              !/Frame was detached|frame has been detached|Execution context was destroyed|Cannot find context/i.test(
+                error.message,
+              )
+            )
+              throw error;
+          }
         }
       }, `12 product lineage in native ${label} theme`);
       await frame.locator(".graph .node").first().focus();
