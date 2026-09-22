@@ -1,0 +1,1183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dataraft-r.github.io/dataraft.ide/schema/bridge-v1.json",
+  "title": "DataRaft IDE envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "generated",
+    "kind",
+    "request_id",
+    "data",
+    "error"
+  ],
+  "properties": {
+    "contract": {
+      "const": 1
+    },
+    "generated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kind": {
+      "enum": [
+        "contexts",
+        "products",
+        "product",
+        "lineage",
+        "quality",
+        "releases",
+        "runs",
+        "freshness",
+        "incidents",
+        "reports",
+        "view",
+        "trial",
+        "profile",
+        "validate_contract",
+        "sample_quality",
+        "error"
+      ]
+    },
+    "request_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "data": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "error": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "request_id",
+        "response_path",
+        "operation"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "response_path": {
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "contexts",
+            "products",
+            "product",
+            "lineage",
+            "quality",
+            "releases",
+            "runs",
+            "freshness",
+            "incidents",
+            "reports",
+            "view",
+            "trial",
+            "profile",
+            "validate_contract",
+            "sample_quality"
+          ]
+        },
+        "context": {
+          "type": "string"
+        },
+        "handle": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "row_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "file_path": {
+          "type": "string"
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "required"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "columns",
+        "key"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/column"
+          }
+        },
+        "key": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "product_id"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "engine",
+        "action",
+        "dimension"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "engine": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dimension": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "id",
+        "status",
+        "kind",
+        "version",
+        "owner",
+        "description",
+        "source_count",
+        "rule_count",
+        "can_trial",
+        "can_view"
+      ],
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "can_trial": {
+          "type": "boolean"
+        },
+        "can_view": {
+          "type": "boolean"
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "id",
+        "status",
+        "kind",
+        "version",
+        "owner",
+        "description",
+        "source_count",
+        "rule_count",
+        "can_trial",
+        "can_view",
+        "contract",
+        "sources",
+        "rules"
+      ],
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "can_trial": {
+          "type": "boolean"
+        },
+        "can_view": {
+          "type": "boolean"
+        },
+        "contract": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/contract"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "label",
+        "kind"
+      ],
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "asset",
+        "rule",
+        "status",
+        "severity",
+        "engine",
+        "stage",
+        "n_failed",
+        "n_total"
+      ],
+      "properties": {
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "asset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "engine": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "n_failed": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "n_total": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "release_id",
+        "asset",
+        "run_id",
+        "release_order",
+        "published_at",
+        "quality",
+        "business_date",
+        "parent_release"
+      ],
+      "properties": {
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "asset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "release_order": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "published_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quality": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "business_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_release": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "asset",
+        "status",
+        "started_at",
+        "finished_at",
+        "release_id"
+      ],
+      "properties": {
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "asset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset",
+        "release_id",
+        "published_at",
+        "freshness",
+        "published_quality",
+        "latest_attempt",
+        "age_hours",
+        "max_age_hours"
+      ],
+      "properties": {
+        "asset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "published_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "freshness": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "published_quality": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "latest_attempt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "age_hours": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max_age_hours": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "created_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodes",
+        "edges",
+        "truncated"
+      ],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "relation"
+            ],
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "relation": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "status"
+      ],
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "status": {
+          "const": "viewed"
+        }
+      }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "status",
+        "result"
+      ],
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/product"
+        }
+      }
+    },
+    "contextsCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/context"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "productsCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/summary"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "qualityCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/quality"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "incidentsCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/quality"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sample_qualityCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/quality"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "releasesCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/release"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "runsCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "freshnessCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/freshness"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "reportsCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "truncated"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/report"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "kind": {
+          "const": "contexts"
+        },
+        "data": {
+          "$ref": "#/$defs/contextsCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "products"
+        },
+        "data": {
+          "$ref": "#/$defs/productsCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "quality"
+        },
+        "data": {
+          "$ref": "#/$defs/qualityCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "incidents"
+        },
+        "data": {
+          "$ref": "#/$defs/incidentsCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "sample_quality"
+        },
+        "data": {
+          "$ref": "#/$defs/sample_qualityCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "releases"
+        },
+        "data": {
+          "$ref": "#/$defs/releasesCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "runs"
+        },
+        "data": {
+          "$ref": "#/$defs/runsCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "freshness"
+        },
+        "data": {
+          "$ref": "#/$defs/freshnessCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "reports"
+        },
+        "data": {
+          "$ref": "#/$defs/reportsCollection"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "product"
+        },
+        "data": {
+          "$ref": "#/$defs/product"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "lineage"
+        },
+        "data": {
+          "$ref": "#/$defs/lineage"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "view"
+        },
+        "data": {
+          "$ref": "#/$defs/view"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "trial"
+        },
+        "data": {
+          "$ref": "#/$defs/trial"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "profile"
+        },
+        "data": {
+          "$ref": "#/$defs/contract"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "validate_contract"
+        },
+        "data": {
+          "$ref": "#/$defs/contract"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "error"
+        },
+        "data": {
+          "type": "null"
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
