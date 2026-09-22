@@ -65,6 +65,7 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
         | { text: string; version: number; diskHash: string; edited: string }
         | undefined;
       let busy = false;
+      let rendered: { body: string; script: string } | undefined;
       let sampleIssues: Issue[] = [];
       const update = (): void => {
         let body: string;
@@ -99,6 +100,10 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
           body = `<h1>Contract editor</h1><p role="alert">${escapeHtml(error instanceof Error ? error.message : "Unable to read YAML.")}</p><button data-command="text">Open YAML text</button>`;
         }
         const script = `const api=acquireVsCodeApi();const version=${document.version};for(const el of document.querySelectorAll('[data-command]'))el.addEventListener('click',()=>api.postMessage({type:el.dataset.command,version}));for(const el of document.querySelectorAll('[data-operation]'))el.addEventListener('click',()=>api.postMessage({type:'preview',version,operations:[{kind:el.dataset.operation,...(el.dataset.index===undefined?{}:{index:Number(el.dataset.index)})}]}));const original=new Map([...document.querySelectorAll('[data-field]')].map(el=>[el,el.type==='checkbox'?el.checked:el.value]));document.getElementById('contract-form')?.addEventListener('submit',event=>{event.preventDefault();const operations=[];for(const [el,old] of original){const value=el.type==='checkbox'?el.checked:el.value;if(value!==old)operations.push({kind:'set',path:JSON.parse(el.dataset.field),value:el.dataset.kind==='number'?Number(value):value});}api.postMessage({type:'preview',version,operations});});`;
+        // An applyEdit change event and its completion can request the same
+        // render. Reloading an unchanged webview would discard in-flight typing.
+        if (rendered?.body === body && rendered.script === script) return;
+        rendered = { body, script };
         panel.webview.html = htmlDocument(
           "DataRaft ODCS Contract",
           body,

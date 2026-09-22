@@ -195,7 +195,9 @@ test(
       dirty = true;
     const errors = [],
       diffs = [];
-    let pendingDiff, diffStarted;
+    let pendingDiff, diffStarted, documentChanged;
+    let renderedHtml = "",
+      renderCount = 0;
     const disposable = { dispose() {} };
     const uri = {
       scheme: "file",
@@ -246,12 +248,16 @@ test(
         fs: { readFile: async () => Buffer.from(disk) },
         registerTextDocumentContentProvider: () => disposable,
         onDidCloseTextDocument: () => disposable,
-        onDidChangeTextDocument: () => disposable,
+        onDidChangeTextDocument: (handler) => {
+          documentChanged = handler;
+          return disposable;
+        },
         onDidSaveTextDocument: () => disposable,
         applyEdit: async (edit) => {
           applied++;
           current = edit.text;
           version++;
+          documentChanged({ document: doc });
           return true;
         },
       },
@@ -287,7 +293,13 @@ test(
     const panel = {
       webview: {
         options: {},
-        html: "",
+        get html() {
+          return renderedHtml;
+        },
+        set html(value) {
+          renderedHtml = value;
+          renderCount++;
+        },
         onDidReceiveMessage: (fn) => {
           receive = fn;
           return disposable;
@@ -363,7 +375,13 @@ test(
     });
     const secondOpening = preview();
     await enteredSecondDiff;
+    const rendersBeforeApply = renderCount;
     await receive({ type: "apply", version });
+    assert.equal(
+      renderCount - rendersBeforeApply,
+      1,
+      "one apply renders once despite change event plus completion",
+    );
     finishDiff();
     await secondOpening;
     assert.equal(applied, 1);

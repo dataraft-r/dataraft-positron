@@ -170,6 +170,19 @@ exports.exerciseWebview = async (document) => {
       "Apply must not save",
     );
 
+    await until(async () => {
+      const rendered = await visibleEditor();
+      return (
+        (await field(rendered).inputValue()) === "Applied form change" &&
+        !(await rendered
+          .getByRole("button", {
+            name: "Apply preview to document",
+            exact: true,
+          })
+          .count())
+      );
+    }, "applied YAML rendered with consumed preview");
+
     await preview("Stale form change");
     const current = document.getText();
     const externalEdit = new vscode.WorkspaceEdit();
@@ -210,6 +223,37 @@ exports.exerciseWebview = async (document) => {
           .screenshot({ path: `${prefix}.png`, timeout: 5000 })
           .catch(() => {});
         for (const [frameIndex, frame] of page.frames().entries()) {
+          if (
+            await frame
+              .locator("#contract-form")
+              .count()
+              .catch(() => 0)
+          ) {
+            console.error(
+              "Webview failure state:",
+              JSON.stringify({
+                documentVersion: document.version,
+                documentName: document.getText().match(/^name: (.+)$/m)?.[1],
+                fieldName: await frame
+                  .locator("[data-field='[\"name\"]']")
+                  .inputValue()
+                  .catch(() => "unavailable"),
+                applyButtons: await frame
+                  .getByRole("button", {
+                    name: "Apply preview to document",
+                    exact: true,
+                  })
+                  .count()
+                  .catch(() => -1),
+                visibleText: (
+                  await frame
+                    .locator("body")
+                    .innerText()
+                    .catch(() => "unavailable")
+                ).slice(0, 400),
+              }),
+            );
+          }
           const html = await frame.content().catch(() => "Frame unavailable");
           await fs.writeFile(`${prefix}-frame-${frameIndex}.html`, html);
         }
