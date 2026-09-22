@@ -179,143 +179,199 @@ test("snapshot validation protects dirty buffers and external file changes indep
 });
 
 // Exercise the custom editor's actual preview/apply path with a minimal host.
-test("custom editor applies only a reviewed current snapshot via WorkspaceEdit, without saving", async () => {
-  const Module = require("node:module");
-  const originalLoad = Module._load;
-  let provider,
-    receive,
-    current = yaml + "# unsaved before opening\n",
-    disk = yaml,
-    version = 1,
-    applied = 0,
-    saveCalls = 0,
-    dirty = true;
-  const errors = [],
-    diffs = [];
-  const disposable = { dispose() {} };
-  const uri = {
-    scheme: "file",
-    toString: () => "file:///orders.contract.yaml",
-  };
-  const doc = {
-    uri,
-    get version() {
-      return version;
-    },
-    get isDirty() {
-      return dirty;
-    },
-    getText: () => current,
-    positionAt: (n) => n,
-    save() {
-      saveCalls++;
-    },
-  };
-  const mock = {
-    Uri: { from: (o) => ({ ...o, toString: () => `${o.scheme}:${o.path}` }) },
-    Diagnostic: class {
-      constructor(range, message) {
-        this.range = range;
-        this.message = message;
-      }
-    },
-    DiagnosticSeverity: { Error: 0 },
-    Range: class {
-      constructor(start, end) {
-        this.start = start;
-        this.end = end;
-      }
-    },
-    WorkspaceEdit: class {
-      replace(uri, range, text) {
-        this.text = text;
-      }
-    },
-    languages: {
-      createDiagnosticCollection: () => ({
-        set() {},
-        delete() {},
-        dispose() {},
-      }),
-    },
-    workspace: {
-      fs: { readFile: async () => Buffer.from(disk) },
-      registerTextDocumentContentProvider: () => disposable,
-      onDidCloseTextDocument: () => disposable,
-      onDidChangeTextDocument: () => disposable,
-      onDidSaveTextDocument: () => disposable,
-      applyEdit: async (edit) => {
-        applied++;
-        current = edit.text;
-        version++;
-        return true;
+test(
+  "custom editor applies only a reviewed current snapshot via WorkspaceEdit, without saving",
+  { timeout: 10000 },
+  async () => {
+    const Module = require("node:module");
+    const originalLoad = Module._load;
+    let provider,
+      receive,
+      current = yaml + "# unsaved before opening\n",
+      disk = yaml,
+      version = 1,
+      applied = 0,
+      saveCalls = 0,
+      dirty = true;
+    const errors = [],
+      diffs = [];
+    let pendingDiff, diffStarted;
+    const disposable = { dispose() {} };
+    const uri = {
+      scheme: "file",
+      toString: () => "file:///orders.contract.yaml",
+    };
+    const doc = {
+      uri,
+      get version() {
+        return version;
       },
-    },
-    window: {
-      registerCustomEditorProvider: (_id, p) => {
-        provider = p;
-        return disposable;
+      get isDirty() {
+        return dirty;
       },
-      showErrorMessage: (message) => errors.push(message),
-    },
-    commands: {
-      registerCommand: () => disposable,
-      executeCommand: async (...args) => diffs.push(args),
-    },
-  };
-  Module._load = function (name, ...args) {
-    return name === "vscode" ? mock : originalLoad.call(this, name, ...args);
-  };
-  let registerYamlEditor;
-  try {
-    ({ registerYamlEditor } = require("../dist/contract-editor.js"));
-  } finally {
-    Module._load = originalLoad;
-  }
-  registerYamlEditor({ subscriptions: [] });
-  const panel = {
-    webview: {
-      options: {},
-      html: "",
-      onDidReceiveMessage: (fn) => {
-        receive = fn;
-        return disposable;
+      getText: () => current,
+      positionAt: (n) => n,
+      save() {
+        saveCalls++;
       },
-    },
-    onDidDispose: () => disposable,
-  };
-  await provider.resolveCustomTextEditor(doc, panel);
-  await receive({ type: "validate", version });
-  assert.match(errors.at(-1), /Save the YAML document explicitly/);
-  assert.equal(diffs.length, 0);
+    };
+    const mock = {
+      Uri: { from: (o) => ({ ...o, toString: () => `${o.scheme}:${o.path}` }) },
+      Diagnostic: class {
+        constructor(range, message) {
+          this.range = range;
+          this.message = message;
+        }
+      },
+      DiagnosticSeverity: { Error: 0 },
+      Range: class {
+        constructor(start, end) {
+          this.start = start;
+          this.end = end;
+        }
+      },
+      WorkspaceEdit: class {
+        replace(uri, range, text) {
+          this.text = text;
+        }
+      },
+      languages: {
+        createDiagnosticCollection: () => ({
+          set() {},
+          delete() {},
+          dispose() {},
+        }),
+      },
+      workspace: {
+        fs: { readFile: async () => Buffer.from(disk) },
+        registerTextDocumentContentProvider: () => disposable,
+        onDidCloseTextDocument: () => disposable,
+        onDidChangeTextDocument: () => disposable,
+        onDidSaveTextDocument: () => disposable,
+        applyEdit: async (edit) => {
+          applied++;
+          current = edit.text;
+          version++;
+          return true;
+        },
+      },
+      window: {
+        registerCustomEditorProvider: (_id, p) => {
+          provider = p;
+          return disposable;
+        },
+        showErrorMessage: (message) => errors.push(message),
+      },
+      commands: {
+        registerCommand: () => disposable,
+        executeCommand: async (...args) => {
+          diffs.push(args);
+          if (args[0] === "vscode.diff") {
+            diffStarted?.();
+            diffStarted = undefined;
+          }
+          if (pendingDiff && args[0] === "vscode.diff") await pendingDiff;
+        },
+      },
+    };
+    Module._load = function (name, ...args) {
+      return name === "vscode" ? mock : originalLoad.call(this, name, ...args);
+    };
+    let registerYamlEditor;
+    try {
+      ({ registerYamlEditor } = require("../dist/contract-editor.js"));
+    } finally {
+      Module._load = originalLoad;
+    }
+    registerYamlEditor({ subscriptions: [] });
+    const panel = {
+      webview: {
+        options: {},
+        html: "",
+        onDidReceiveMessage: (fn) => {
+          receive = fn;
+          return disposable;
+        },
+      },
+      onDidDispose: () => disposable,
+    };
+    await provider.resolveCustomTextEditor(doc, panel);
+    await receive({ type: "validate", version });
+    assert.match(errors.at(-1), /Save the YAML document explicitly/);
+    assert.equal(diffs.length, 0);
 
-  const preview = () =>
-    receive({
-      type: "preview",
-      version,
-      operations: [{ kind: "set", path: ["name"], value: "Reviewed" }],
+    const preview = () =>
+      receive({
+        type: "preview",
+        version,
+        operations: [{ kind: "set", path: ["name"], value: "Reviewed" }],
+      });
+    // Reproduce a slow host opening the immutable diff: the enabled controls
+    // must still accept one click, without waiting for the display promise.
+    let finishDiff;
+    pendingDiff = new Promise((resolve) => {
+      finishDiff = resolve;
     });
-  await preview();
-  assert.equal(applied, 0);
-  assert.equal(diffs.at(-1)[0], "vscode.diff");
-  assert.match(panel.webview.html, /Apply preview to document/);
-  disk = yaml + "# concurrent external edit\n";
-  await receive({ type: "apply", version });
-  assert.equal(applied, 0);
-  assert.match(errors.at(-1), /saved file changed/);
-  disk = yaml;
-  await preview();
-  version++;
-  await receive({ type: "apply", version });
-  assert.equal(applied, 0);
-  assert.match(errors.at(-1), /document changed/);
-  await preview();
-  await receive({ type: "apply", version });
-  assert.equal(applied, 1);
-  assert.match(current, /name: 'Reviewed'/);
-  assert.match(current, /# unsaved before opening/);
-  assert.equal(saveCalls, 0);
-});
+    const enteredDiff = new Promise((resolve) => {
+      diffStarted = resolve;
+    });
+    const opening = preview();
+    await enteredDiff;
+    assert.match(panel.webview.html, /Apply preview to document/);
+    await receive({ type: "discard", version });
+    assert.ok(!panel.webview.html.includes("Apply preview to document"));
+    assert.equal(applied, 0);
+    finishDiff();
+    await opening;
+    let failDiff;
+    pendingDiff = new Promise((resolve, reject) => {
+      failDiff = reject;
+    });
+    await preview();
+    failDiff(new Error("Diff could not open"));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(!panel.webview.html.includes("Apply preview to document"));
+    assert.match(errors.at(-1), /Diff could not open/);
+
+    pendingDiff = new Promise((resolve, reject) => {
+      failDiff = reject;
+    });
+    await preview();
+    pendingDiff = undefined;
+    await preview();
+    failDiff(new Error("An older diff failed"));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.match(panel.webview.html, /Apply preview to document/);
+    assert.equal(applied, 0);
+    assert.equal(diffs.at(-1)[0], "vscode.diff");
+    assert.match(panel.webview.html, /Apply preview to document/);
+    disk = yaml + "# concurrent external edit\n";
+    await receive({ type: "apply", version });
+    assert.equal(applied, 0);
+    assert.match(errors.at(-1), /saved file changed/);
+    disk = yaml;
+    await preview();
+    version++;
+    await receive({ type: "apply", version });
+    assert.equal(applied, 0);
+    assert.match(errors.at(-1), /document changed/);
+    pendingDiff = new Promise((resolve) => {
+      finishDiff = resolve;
+    });
+    const enteredSecondDiff = new Promise((resolve) => {
+      diffStarted = resolve;
+    });
+    const secondOpening = preview();
+    await enteredSecondDiff;
+    await receive({ type: "apply", version });
+    finishDiff();
+    await secondOpening;
+    assert.equal(applied, 1);
+    assert.match(current, /name: 'Reviewed'/);
+    assert.match(current, /# unsaved before opening/);
+    assert.equal(saveCalls, 0);
+  },
+);
 
 test("sample profile proposes explicit column changes and preserves unselected YAML metadata", () => {
   const profile = {

@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
+const path = require("node:path");
 const { chromium } = require("playwright-core");
 const vscode = require("vscode");
 
@@ -26,12 +27,7 @@ exports.exerciseWebview = async (document) => {
   });
   for (const context of browser.contexts()) context.setDefaultTimeout(15000);
   try {
-    const editor = async () => {
-      await vscode.commands.executeCommand(
-        "vscode.openWith",
-        document.uri,
-        "dataraft.contractYaml",
-      );
+    const visibleEditor = async () => {
       return until(async () => {
         for (const context of browser.contexts())
           for (const page of context.pages())
@@ -55,6 +51,14 @@ exports.exerciseWebview = async (document) => {
           `${error.message}; CDP pages/frames: ${JSON.stringify(targets)}`,
         );
       });
+    };
+    const editor = async () => {
+      await vscode.commands.executeCommand(
+        "vscode.openWith",
+        document.uri,
+        "dataraft.contractYaml",
+      );
+      return visibleEditor();
     };
     const field = (frame) => frame.locator("[data-field='[\"name\"]']");
     const preview = async (name) => {
@@ -92,7 +96,7 @@ exports.exerciseWebview = async (document) => {
     await until(
       async () =>
         !(await (
-          await editor()
+          await visibleEditor()
         )
           .getByRole("button", {
             name: "Apply preview to document",
@@ -131,7 +135,7 @@ exports.exerciseWebview = async (document) => {
     await until(
       async () =>
         !(await (
-          await editor()
+          await visibleEditor()
         )
           .getByRole("button", {
             name: "Apply preview to document",
@@ -148,6 +152,23 @@ exports.exerciseWebview = async (document) => {
       await fs.readFile(document.uri.fsPath, "utf8"),
       document.getText(),
     );
+  } catch (error) {
+    const directory = path.resolve(__dirname, "../check/host-webview");
+    await fs.mkdir(directory, { recursive: true });
+    let index = 0;
+    for (const context of browser.contexts()) {
+      for (const page of context.pages()) {
+        const prefix = path.join(directory, String(index++));
+        await page
+          .screenshot({ path: `${prefix}.png`, timeout: 5000 })
+          .catch(() => {});
+        for (const [frameIndex, frame] of page.frames().entries()) {
+          const html = await frame.content().catch(() => "Frame unavailable");
+          await fs.writeFile(`${prefix}-frame-${frameIndex}.html`, html);
+        }
+      }
+    }
+    throw error;
   } finally {
     // Disconnect this CDP client; the existing extension-host runner owns VS Code.
     await browser.close();

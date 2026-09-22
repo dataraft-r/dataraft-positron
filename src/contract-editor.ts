@@ -193,12 +193,27 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
               );
               proposal = { ...captured, edited };
               update();
-              await vscode.commands.executeCommand(
-                "vscode.diff",
-                snapshot(captured.text, "current"),
-                snapshot(edited, "profile-proposal"),
-                "DataRaft: proposed sample columns",
-              );
+              // Displaying immutable snapshots must not lock enabled Apply/Discard
+              // controls while the editor host is still opening the diff tab.
+              const displayedProposal = proposal;
+              void vscode.commands
+                .executeCommand(
+                  "vscode.diff",
+                  snapshot(captured.text, "current"),
+                  snapshot(edited, "profile-proposal"),
+                  "DataRaft: proposed sample columns",
+                )
+                .then(undefined, (error: unknown) => {
+                  if (proposal === displayedProposal) {
+                    proposal = undefined;
+                    update();
+                  }
+                  void vscode.window.showErrorMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not open the preview diff.",
+                  );
+                });
               return;
             }
             if (message.type === "validate" || message.type === "sample") {
@@ -273,12 +288,27 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
               );
               proposal = { text, version, diskHash: currentDisk, edited };
               update();
-              await vscode.commands.executeCommand(
-                "vscode.diff",
-                snapshot(text, "current"),
-                snapshot(edited, "proposed"),
-                "DataRaft: proposed YAML edit",
-              );
+              // The proposal is complete; opening its immutable diff is not a
+              // document mutation and must not block subsequent button actions.
+              const displayedProposal = proposal;
+              void vscode.commands
+                .executeCommand(
+                  "vscode.diff",
+                  snapshot(text, "current"),
+                  snapshot(edited, "proposed"),
+                  "DataRaft: proposed YAML edit",
+                )
+                .then(undefined, (error: unknown) => {
+                  if (proposal === displayedProposal) {
+                    proposal = undefined;
+                    update();
+                  }
+                  void vscode.window.showErrorMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not open the preview diff.",
+                  );
+                });
             } else if (message.type === "apply") {
               if (!proposal)
                 throw new Error("Preview an edit before applying it.");
@@ -319,6 +349,7 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
         }),
       ];
       panel.onDidDispose(() => {
+        proposal = undefined;
         disposables.forEach((disposable) => disposable.dispose());
         diagnostics.delete(document.uri);
       });
