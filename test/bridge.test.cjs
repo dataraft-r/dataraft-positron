@@ -358,3 +358,77 @@ test("cleanup retries transient nonempty-directory failures from a late writer",
     { timeout: 10000 },
   );
 });
+
+test("v2 diagnostics validate independently without accepting protocol drift in v1 operations", () => {
+  const diagnostic = {
+    contract: 2,
+    generated: "2026-09-22T00:00:00Z",
+    kind: "diagnostics",
+    request_id: "diagnostic",
+    error: null,
+    data: {
+      items: [
+        {
+          rule: "positive",
+          status: "failed",
+          severity: "error",
+          path: "/workspace/rules.R",
+          file_hash: "a".repeat(64),
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 12 },
+        },
+      ],
+      truncated: false,
+    },
+  };
+  assert.deepEqual(
+    validateEnvelope(diagnostic, {
+      requestId: "diagnostic",
+      operation: "diagnostics",
+      version: 2,
+    }),
+    diagnostic,
+  );
+  assert.throws(
+    () =>
+      validateEnvelope(diagnostic, {
+        requestId: "diagnostic",
+        operation: "diagnostics",
+        version: 1,
+      }),
+    /protocol/,
+  );
+  for (const mutate of [
+    (x) => (x.data.items[0].start.line = -1),
+    (x) => (x.data.items[0].file_hash = "not-a-hash"),
+    (x) => (x.data.items[0].raw_source = "private executable code"),
+    (x) => (x.data.items[0].severity = "information"),
+    (x) => (x.contract = 1),
+  ]) {
+    const invalid = structuredClone(diagnostic);
+    mutate(invalid);
+    assert.throws(() => validateEnvelope(invalid), /Invalid/);
+  }
+  const oldError = {
+    contract: 1,
+    generated: diagnostic.generated,
+    kind: "error",
+    request_id: "diagnostic",
+    data: null,
+    error: { code: "invalid_request", message: "Invalid IDE request." },
+  };
+  assert.throws(
+    () =>
+      validateEnvelope(oldError, {
+        requestId: "diagnostic",
+        operation: "diagnostics",
+        version: 2,
+      }),
+    /protocol v2.*Update/,
+  );
+  assert.equal(
+    validateEnvelope(response({ operation: "products", request_id: "v1" }))
+      .contract,
+    1,
+  );
+});

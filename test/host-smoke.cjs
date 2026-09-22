@@ -143,6 +143,7 @@ exports.run = async () => {
     );
     assert.equal(await document.save(), true);
     assert.equal(await fs.readFile(uri.fsPath, "utf8"), changed);
+    await require("./host-webview.cjs").exerciseWebview(document);
   } finally {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     await fs.rm(directory, { recursive: true, force: true });

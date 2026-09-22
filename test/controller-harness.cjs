@@ -34,6 +34,10 @@ async function harness(t) {
   );
   for (const [name] of savedModules) delete require.cache[name];
   const h = {
+    diagnosticCollections: new Map(),
+    documentChanges: [],
+    watchers: [],
+    information: [],
     commands: new Map(),
     views: new Map(),
     errors: [],
@@ -63,15 +67,74 @@ async function harness(t) {
     TreeItem: class {},
     TreeItemCollapsibleState: { Collapsed: 1, None: 0 },
     ProgressLocation: { Notification: 15 },
-    Uri: { from: (value) => value },
-    languages: {
-      createDiagnosticCollection: () => ({
-        ...disposable,
-        set() {},
-        delete() {},
+    Uri: {
+      from: (value) => value,
+      file: (value) => ({
+        scheme: "file",
+        fsPath: value,
+        toString: () => value,
       }),
     },
+    Range: class {
+      constructor(startLine, startCharacter, endLine, endCharacter) {
+        this.start = { line: startLine, character: startCharacter };
+        this.end = { line: endLine, character: endCharacter };
+      }
+    },
+    Diagnostic: class {
+      constructor(range, message, severity) {
+        Object.assign(this, { range, message, severity });
+      }
+    },
+    DiagnosticSeverity: { Error: 0, Warning: 1 },
+    RelativePattern: class {
+      constructor(base, pattern) {
+        Object.assign(this, { base, pattern });
+      }
+    },
+    languages: {
+      createDiagnosticCollection: (name) => {
+        const values = new Map();
+        h.diagnosticCollections.set(name, values);
+        return {
+          set(uri, items) {
+            values.set(uri.fsPath, items);
+          },
+          delete(uri) {
+            values.delete(uri.fsPath);
+          },
+          clear() {
+            values.clear();
+          },
+          dispose() {
+            values.clear();
+          },
+        };
+      },
+    },
     workspace: {
+      workspaceFolders: [],
+      textDocuments: [],
+      createFileSystemWatcher: (pattern) => {
+        const watcher = {
+          pattern,
+          dispose() {},
+          onDidChange(fn) {
+            this.change = fn;
+            return disposable;
+          },
+          onDidCreate(fn) {
+            this.create = fn;
+            return disposable;
+          },
+          onDidDelete(fn) {
+            this.delete = fn;
+            return disposable;
+          },
+        };
+        h.watchers.push(watcher);
+        return watcher;
+      },
       get isTrusted() {
         return h.trusted;
       },
@@ -81,7 +144,10 @@ async function harness(t) {
       onDidGrantWorkspaceTrust: () => disposable,
       registerTextDocumentContentProvider: () => disposable,
       onDidCloseTextDocument: () => disposable,
-      onDidChangeTextDocument: () => disposable,
+      onDidChangeTextDocument: (fn) => {
+        h.documentChanges.push(fn);
+        return disposable;
+      },
       onDidSaveTextDocument: () => disposable,
       openTextDocument: async (value) => {
         h.documents.push(value);
@@ -98,6 +164,9 @@ async function harness(t) {
       showQuickPick: async (choices) => {
         h.choices.push(choices);
         return h.picks.length ? h.picks.shift()(choices) : choices[0];
+      },
+      showInformationMessage: (message) => {
+        h.information.push(message);
       },
       showErrorMessage: (error) => {
         h.errors.push(error);
@@ -142,7 +211,7 @@ async function harness(t) {
         h.requests.push({ ...req, sessionId: args[7] });
         const data = await h.respond(req);
         const envelope = {
-          contract: 1,
+          contract: req.version,
           generated: "2026-09-22T00:00:00Z",
           request_id: req.request_id,
           kind: req.operation,
@@ -151,7 +220,7 @@ async function harness(t) {
         };
         await fs.writeFile(
           req.response_path + ".tmp",
-          JSON.stringify(envelope),
+          JSON.stringify(h.envelope ? h.envelope(req, data) : envelope),
         );
         await fs.rename(req.response_path + ".tmp", req.response_path);
       },
@@ -163,9 +232,11 @@ async function harness(t) {
   const context = { subscriptions: [] };
   try {
     require("../dist/extension").activate(context);
+    h.diagnostics = require("../dist/rule-diagnostics");
   } finally {
     Module._load = originalLoad;
   }
+  h.workspace = mock.workspace;
   h.command = (name, ...args) => h.commands.get("dataraft." + name)(...args);
   t.after(async () => {
     for (const item of context.subscriptions) item.dispose();

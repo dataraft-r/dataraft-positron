@@ -14,6 +14,7 @@ export interface Dispatch {
   (code: string, sessionId: string): PromiseLike<unknown> | void;
 }
 export interface RequestInput {
+  version?: 1 | 2;
   operation: Operation;
   context?: string;
   handle?: string;
@@ -123,6 +124,7 @@ export class BridgeTransport {
               validateEnvelope(parsed, {
                 requestId,
                 operation: input.operation,
+                version: request.version,
               }),
             );
           } catch (error) {

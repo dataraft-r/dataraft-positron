@@ -169,7 +169,11 @@ export class MetadataTree implements vscode.TreeDataProvider<MetadataNode> {
     item.id = node.id;
     item.description = node.description;
     item.tooltip = `${node.label}${node.description ? `\n${node.description}` : ""}`;
-    item.contextValue = node.product ? "dataraft.product" : "dataraft.metadata";
+    item.contextValue = node.product
+      ? node.product.kind === "result"
+        ? "dataraft.result"
+        : "dataraft.product"
+      : "dataraft.metadata";
     const status = node.product?.status.toLowerCase();
     const appearance =
       status && ["blocked", "failed", "fail", "error"].includes(status)

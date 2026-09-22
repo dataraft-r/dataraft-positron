@@ -1,12 +1,14 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
-const { mkdtemp, rm } = require("node:fs/promises");
+const { mkdtemp, rm, readFile, writeFile } = require("node:fs/promises");
 const { join } = require("node:path");
 const { tmpdir } = require("node:os");
 const Ajv2020 = require("ajv/dist/2020");
 const addFormats = require("ajv-formats");
 const schema = require("../../schemas/bridge-v1.json");
+const diagnosticsSchema = require("../../schemas/bridge-v2.json");
+const { createHash } = require("node:crypto");
 const { BridgeTransport } = require("../../dist/transport");
 
 test(
@@ -16,6 +18,10 @@ test(
     const ajv = new Ajv2020({ allErrors: true, strict: false });
     addFormats(ajv);
     const validateResponse = ajv.compile(schema);
+    const validateDiagnostics = ajv.compile(diagnosticsSchema);
+    const validateDiagnosticsRequest = ajv.compile({
+      $ref: diagnosticsSchema.$id + "#/$defs/request",
+    });
     const validateRequest = ajv.compile({
       $ref: schema.$id + "#/$defs/request",
     });
@@ -64,10 +70,9 @@ test(
         const request = JSON.parse(
           Buffer.from(match[1], "base64").toString("utf8"),
         );
-        assert.ok(
-          validateRequest(request),
-          JSON.stringify(validateRequest.errors),
-        );
+        const validator =
+          request.version === 2 ? validateDiagnosticsRequest : validateRequest;
+        assert.ok(validator(request), JSON.stringify(validator.errors));
         return send(match[1]);
       },
       60000,
@@ -94,10 +99,9 @@ test(
           `${input.operation}: ${JSON.stringify(response.error)}`,
         );
       }
-      assert.ok(
-        validateResponse(response),
-        JSON.stringify(validateResponse.errors),
-      );
+      const validator =
+        input.version === 2 ? validateDiagnostics : validateResponse;
+      assert.ok(validator(response), JSON.stringify(validator.errors));
       const json = JSON.stringify(response);
       for (const secret of [
         "ROW_VALUE_42",
@@ -260,6 +264,53 @@ test(
         "unsafe ODCS is rejected without poisoning subsequent validation",
       );
 
+      const diagnosticTrial = await request({
+        operation: "trial",
+        handle: "binding:diagnostic_product",
+      });
+      assert.equal(diagnosticTrial.status, "blocked");
+      const diagnostics = await request({
+        version: 2,
+        operation: "diagnostics",
+        handle: diagnosticTrial.handle,
+      });
+      assert.equal(
+        diagnostics.items.length,
+        1,
+        "actual sourced function supplies one verified location",
+      );
+      const source = diagnostics.items[0];
+      assert.equal(source.rule, "positive");
+      assert.equal(source.status, "failed");
+      assert.equal(source.severity, "error");
+      assert.equal(source.path, join(root, "rule-source.R"));
+      const original = await readFile(source.path);
+      assert.equal(
+        source.file_hash,
+        createHash("sha256").update(original).digest("hex"),
+      );
+      assert.equal(source.start.line, 1);
+      assert.equal(source.end.line, 1);
+      assert.equal(source.start.character, "positive <- ".length);
+      assert.equal(
+        source.end.character,
+        original.toString("utf8").split("\n")[1].length,
+      );
+      await writeFile(
+        source.path,
+        Buffer.concat([original, Buffer.from("# changed after trial\n")]),
+      );
+      const staleDiagnostics = await request({
+        version: 2,
+        operation: "diagnostics",
+        handle: diagnosticTrial.handle,
+      });
+      assert.equal(
+        staleDiagnostics.items.length,
+        0,
+        "changed source has no stale markers",
+      );
+
       await send("UPDATE_WORKSPACE");
       const changed = await request({ operation: "products" });
       assert.ok(
@@ -268,8 +319,8 @@ test(
       );
       assert.equal(
         responseCount,
-        25,
-        "18 original responses plus 7 contract, bounded-quality and error-recovery responses",
+        28,
+        "25 existing responses plus sourced-rule trial, v2 diagnostics and stale-source rejection",
       );
       t.diagnostic(
         `${responseCount} real R responses passed file transport, canonical JSON Schema and Node protocol checks`,

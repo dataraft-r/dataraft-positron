@@ -16,3 +16,5 @@ dist/contract-editor.js
 dist/protocol.js
 dist/render.js
 dist/transport.js
+
+dist/rule-diagnostics.js
