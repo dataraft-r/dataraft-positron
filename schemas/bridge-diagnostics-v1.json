@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dataraft-r.github.io/dataraft.ide/schema/bridge-v2.json",
-  "title": "DataRaft IDE explicit source diagnostics v2",
+  "$id": "https://dataraft-r.github.io/dataraft.ide/schema/bridge-diagnostics-v1.json",
+  "title": "DataRaft IDE source diagnostics channel v1",
   "type": "object",
   "additionalProperties": false,
   "required": [

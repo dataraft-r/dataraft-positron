@@ -17,8 +17,10 @@ vapply(c("dataraft.core", "dataraft.ide", "dataraft.adapters", "yaml"),
 .libPaths()
 ```
 
-Use installed candidate R packages with the diagnostics API
-`dataraft.ide::ide_diagnostics()`. Install the extension on the **same host as R**;
+Use installed candidate R packages, including `dataraft.ide` 0.1.0.9002 or newer.
+The extension accesses the independent diagnostics channel through the public
+`dataraft.ide::ide_request()` boundary; operation helpers are internal.
+Install the extension on the **same host as R**;
 both processes must see the same temporary directory and saved workspace files.
 A local extension host and separately hosted R session are unsupported. Trust
 this test workspace. No lake or database is required for the checks below.

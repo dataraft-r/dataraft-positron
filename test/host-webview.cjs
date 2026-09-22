@@ -66,6 +66,8 @@ async function frameLocator(page, frame) {
   return current;
 }
 
+exports.frameLocator = frameLocator;
+
 exports.exerciseWebview = async (document, existingBrowser) => {
   const port = Number(process.env.DATARAFT_HOST_CDP_PORT);
   assert.ok(Number.isInteger(port) && port > 0, "Host CDP port is required");

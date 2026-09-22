@@ -414,6 +414,8 @@ exports.run = async () => {
         (item) => item.metadata.sessionId === sessionId,
       ),
     );
+    await require("./lineage-gallery.cjs").capture(vscode, page, artifacts, until);
+    checkpoint("12 product lineage screenshots in native light and dark themes");
     await fs.writeFile(
       path.join(artifacts, "acceptance.json"),
       JSON.stringify({ sessionId, completed }, null, 2),

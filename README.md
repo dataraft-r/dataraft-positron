@@ -33,17 +33,17 @@ The saved-file baseline comes from opening the editor and explicit saves. If ano
 
 ## VS Code and remote workspaces
 
-Without Positron, **Open Metadata JSON** displays bridge-v1 snapshots and the YAML editor remains available. Live R commands explain that Positron is required. Untrusted workspaces allow offline JSON and YAML editing only.
+Without Positron, **Open Metadata JSON** displays metadata-channel snapshots and the YAML editor remains available. Live R commands explain that Positron is required. Untrusted workspaces allow offline JSON and YAML editing only.
 
 This is a workspace extension: in Positron Workbench or a remote workspace, install it on the same host as the R session. Both must access the same temporary directory and saved YAML paths. A local extension host with a separately hosted R session is unsupported.
 
 ## Transport and limits
 
-Existing metadata, trial and viewer requests use numeric protocol version 1. Only **Show R Rule Diagnostics** explicitly opts into version 2. The extension sends base64-encoded JSON to `dataraft.ide::ide_request()` using the selected R console session ID. It ignores `executeCode()` results and never parses console output or evaluates R source. An atomic response file in a private temporary directory carries a matching request ID and exact metadata DTOs. Requests are serialized; cancellation/disposal prevents queued extension requests from dispatching. Timeout or cancellation stops waiting, but R work already queued may still finish.
+Metadata, trial and viewer requests use the metadata channel (wire discriminator 1). **Show R Rule Diagnostics** uses the independent diagnostics channel (wire discriminator 2), not a successor metadata protocol. The extension sends base64-encoded JSON to `dataraft.ide::ide_request()` using the selected R console session ID. It ignores `executeCode()` results and never parses console output or evaluates R source. An atomic response file in a private temporary directory carries a matching request ID and exact metadata DTOs. Requests are serialized; cancellation/disposal prevents queued extension requests from dispatching. Timeout or cancellation stops waiting, but R work already queued may still finish.
 
 Requests are limited to 16 KiB and responses to 1 MiB. Symlinks, unexpected DTO fields, invalid versions and stale request IDs are rejected. Metadata text may itself be sensitive; share snapshots deliberately. The bridge is not a sandbox for user transforms or a defense against another process running as the same OS user.
 
-Implementation uses the [official Positron extension API](https://positron.posit.co/extension-development.html), pinned to `@posit-dev/positron` 0.2.10. The full bridge JSON Schema is included in `schemas/bridge-v1.json`.
+Implementation uses the [official Positron extension API](https://positron.posit.co/extension-development.html), pinned to `@posit-dev/positron` 0.2.10. The independent channel schemas are `schemas/bridge-metadata-v1.json` and `schemas/bridge-diagnostics-v1.json`. Their numeric wire discriminators remain 1 and 2 for compatibility; diagnostics is not a replacement metadata protocol. See [compatibility and pin maintenance](docs/maintenance.md) for ownership, review cadence and the update procedure.
 
 ## Validation
 
@@ -59,7 +59,7 @@ The [manual Positron acceptance guide](docs/positron-acceptance.md) remains nece
 
 ## R rule diagnostics
 
-After an explicit Trial, select its retained result and run **Show R Rule Diagnostics**. This command requires a v2-capable `dataraft.ide`; older bridges produce an upgrade message while existing v1 features remain usable. It does not rerun the product.
+After an explicit Trial, select its retained result and run **Show R Rule Diagnostics**. This command requires a diagnostics-capable `dataraft.ide`; older bridges produce an upgrade message while existing v1 features remain usable. It does not rerun the product.
 
 Only function rules loaded with `source(..., keep.source = TRUE)` can provide verified R source references. Formula locations are unavailable. The bridge snapshots source hashes before the trial; the extension accepts only unchanged UTF-8 files of at most one MiB inside the current workspace, with valid zero-based UTF-16 ranges. Dirty or stale editor buffers, changed files, outside-workspace paths and invalid ranges receive no markers. Diagnostic messages contain the rule identifier and status, without failure rows or condition text.
 

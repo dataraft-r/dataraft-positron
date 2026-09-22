@@ -1,7 +1,7 @@
 import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
-import bridgeSchema from "../schemas/bridge-v1.json";
-import diagnosticsSchema from "../schemas/bridge-v2.json";
+import bridgeSchema from "../schemas/bridge-metadata-v1.json";
+import diagnosticsSchema from "../schemas/bridge-diagnostics-v1.json";
 export const CONTRACT = 1 as const;
 export const OPERATIONS = [
   "contexts",
