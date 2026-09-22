@@ -45,4 +45,10 @@ Implementation uses the [official Positron extension API](https://positron.posit
 
 ## Validation
 
-`npm test` compiles TypeScript and runs Node tests for transport, request injection, atomic rename, bounds, cancellation, queue disposal, strict DTO validation, lineage escaping and conflict-safe YAML editing. `npm run test:host` runs an extension-host smoke test when a graphical test environment is available. A real Positron session is required to validate the final R UI integration; Node tests do not substitute for that check.
+The test layers exercise different boundaries:
+
+- `npm test` compiles TypeScript and runs Node tests. Real controller code uses an isolated VS Code/Positron API double to check R console filtering, cancelled selection, vanished/busy/untrusted sessions, session switches at asynchronous boundaries, explicit Trial and bounded View, stale responses and recovery. Transport tests use actual temporary files and atomic renames, including malformed responses, cancellation, queue recovery and cleanup. YAML tests cover AST preservation, conflict checks, sample profiling and diagnostic source ranges.
+- `npm run test:integration` uses a real persistent R process and the actual bridge package to validate metadata and execution evidence across multiple requests. See `test/integration/README.md` for prerequisites.
+- `npm run test:host` requires a graphical environment or Xvfb and uses the pinned VS Code 1.96.4 extension host. It checks every declared command and the real YAML custom-editor lifecycle: document edits, diagnostics, an unsaved-versus-saved diff and explicit save. It does not simulate a Positron runtime or exercise webview button clicks.
+
+A real Positron session is still needed to verify R console selection and the R data viewer in the application. Neither the Node tests nor the VS Code host tests establish that GUI coverage.

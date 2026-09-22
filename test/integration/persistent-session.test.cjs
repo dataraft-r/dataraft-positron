@@ -74,18 +74,26 @@ test(
       root,
     );
     let responseCount = 0;
-    async function request(input) {
+    async function request(input, expectedError = null) {
       const response = await Promise.race([
         bridge.request("persistent-r-fixture", input, t.signal),
         exited.then(() => {
           throw new Error("R session closed before its response.");
         }),
       ]);
-      assert.equal(
-        response.error,
-        null,
-        `${input.operation}: ${JSON.stringify(response.error)}`,
-      );
+      if (expectedError) {
+        assert.equal(response.kind, "error");
+        assert.equal(response.data, null);
+        assert.equal(response.error?.code, expectedError);
+        assert.equal(typeof response.error.message, "string");
+        assert.ok(response.error.message.length > 0);
+      } else {
+        assert.equal(
+          response.error,
+          null,
+          `${input.operation}: ${JSON.stringify(response.error)}`,
+        );
+      }
       assert.ok(
         validateResponse(response),
         JSON.stringify(validateResponse.errors),
@@ -96,6 +104,11 @@ test(
         "PRIVATE_PERSON",
         "PRIVATE_CLAIM_HISTORY",
         "SOURCE_BODY_MUST_NOT_LEAK",
+        "QUALITY_PRIVATE_FIRST",
+        "QUALITY_PRIVATE_SECOND",
+        "QUALITY_PRIVATE_THIRD",
+        "987654321",
+        "CONTRACT_SOURCE_MUST_NOT_LEAK",
       ]) {
         assert.ok(
           !json.includes(secret),
@@ -103,7 +116,7 @@ test(
         );
       }
       responseCount++;
-      return response.data;
+      return expectedError ? response : response.data;
     }
     try {
       const contexts = await request({ operation: "contexts" });
@@ -175,11 +188,88 @@ test(
         profile.columns.map((x) => x.name),
         ["id", "owner", "description"],
       );
+      const contractFile = join(root, "sample.contract.yaml");
+      const contract = await request({
+        operation: "validate_contract",
+        file_path: contractFile,
+      });
+      assert.equal(contract.id, "sample.contract");
+      assert.equal(contract.version, "1.0.0");
+      assert.deepEqual(
+        contract.columns.map(({ name, type }) => ({ name, type })),
+        [
+          { name: "amount", type: "numeric" },
+          { name: "claimant", type: "character" },
+        ],
+      );
+      const twoRows = await request({
+        operation: "sample_quality",
+        handle: "binding:sample_rows",
+        file_path: contractFile,
+        row_limit: 2,
+      });
+      const failure = twoRows.items.find((x) => x.rule === "nonnegative");
+      assert.ok(failure, "the exported explicit quality rule is executed");
+      assert.equal(failure.status, "failed");
+      assert.equal(failure.n_total, 2);
+      assert.equal(
+        failure.n_failed,
+        1,
+        "the third failing row is outside the requested sample",
+      );
+      assert.equal(twoRows.truncated, false);
+      const oneRow = await request({
+        operation: "sample_quality",
+        handle: "binding:sample_rows",
+        file_path: contractFile,
+        row_limit: 1,
+      });
+      const passed = oneRow.items.find((x) => x.rule === "nonnegative");
+      assert.equal(passed.status, "passed");
+      assert.equal(passed.n_total, 1);
+      assert.equal(passed.n_failed, 0);
+      assert.ok(!oneRow.items.some((x) => x.status === "failed"));
+
+      await request(
+        { operation: "product", handle: "result:unavailable-opaque-handle" },
+        "not_found",
+      );
+      const recovered = await request({
+        operation: "product",
+        handle: trial.handle,
+      });
+      assert.equal(
+        recovered.handle,
+        trial.handle,
+        "a structured handle error does not lose retained results or end the R session",
+      );
+      await request(
+        {
+          operation: "validate_contract",
+          file_path: join(root, "invalid.contract.yaml"),
+        },
+        "execution_failed",
+      );
+      const recoveredContract = await request({
+        operation: "validate_contract",
+        file_path: contractFile,
+      });
+      assert.deepEqual(
+        recoveredContract,
+        contract,
+        "unsafe ODCS is rejected without poisoning subsequent validation",
+      );
+
       await send("UPDATE_WORKSPACE");
       const changed = await request({ operation: "products" });
       assert.ok(
         changed.items.some((x) => x.id === "orders.changed"),
         "the next request observes a changed binding",
+      );
+      assert.equal(
+        responseCount,
+        25,
+        "18 original responses plus 7 contract, bounded-quality and error-recovery responses",
       );
       t.diagnostic(
         `${responseCount} real R responses passed file transport, canonical JSON Schema and Node protocol checks`,

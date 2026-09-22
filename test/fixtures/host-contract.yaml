@@ -1,0 +1,11 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: orders
+name: Orders
+version: "1"
+schema:
+  - name: orders
+    logicalType: object
+    properties:
+      - name: amount
+        logicalType: number

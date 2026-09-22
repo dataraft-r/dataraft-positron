@@ -43,6 +43,26 @@ delayedAssign(
 workspace$lake <- dr_open_lake(file.path(root, "lake"))
 dr_publish(workspace$orders, to = workspace$lake)
 dr_publish(workspace$model, to = workspace$lake)
+# Saved ODCS fixtures use the same public exporter as an editor-created contract.
+workspace$sample_rows <- data.frame(
+  amount = c(10, -20, -987654321),
+  claimant = c(
+    "QUALITY_PRIVATE_FIRST",
+    "QUALITY_PRIVATE_SECOND",
+    "QUALITY_PRIVATE_THIRD"
+  )
+)
+sample_contract <- dr_contract(
+  id = "sample.contract",
+  version = "1.0.0",
+  columns = c(amount = "numeric", claimant = "character"),
+  rules = list(nonnegative = ~ amount >= 0)
+)
+odcs <- dataraft.adapters::dr_contract_odcs(sample_contract)
+yaml::write_yaml(odcs, file.path(root, "sample.contract.yaml"))
+odcs$schema[[1L]]$quality[[1L]]$implementation$predicate <-
+  'system("CONTRACT_SOURCE_MUST_NOT_LEAK")'
+yaml::write_yaml(odcs, file.path(root, "invalid.contract.yaml"))
 context <- ide_context(workspace)
 
 input <- file("stdin", open = "r")
