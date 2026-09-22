@@ -19,6 +19,53 @@ async function until(get, label) {
   throw new Error(`Timed out waiting for ${label}`);
 }
 
+// A Frame becomes invalid when VS Code replaces a webview document. Resolve
+// its actual iframe chain once, then let Playwright re-resolve that chain for
+// each action rather than retaining the transient renderer Frame object.
+async function frameLocator(page, frame) {
+  const chain = [];
+  for (let child = frame; child.parentFrame(); child = child.parentFrame()) {
+    const owner = await child.frameElement();
+    const identity = await owner.evaluate((element) => {
+      if (element.id)
+        return { selector: `iframe[id=${JSON.stringify(element.id)}]` };
+      if (element.name)
+        return { selector: `iframe[name=${JSON.stringify(element.name)}]` };
+      return {
+        selector: "iframe",
+        index: [...element.ownerDocument.querySelectorAll("iframe")].indexOf(
+          element,
+        ),
+      };
+    });
+    if (identity.index === undefined) {
+      assert.equal(
+        await child.parentFrame().locator(identity.selector).count(),
+        1,
+        `Webview iframe identity must be unique: ${identity.selector}`,
+      );
+    } else {
+      assert.ok(
+        identity.index >= 0,
+        "Webview iframe must belong to its parent DOM",
+      );
+    }
+    chain.unshift(identity);
+  }
+  assert.ok(
+    chain.length,
+    "The production editor must be inside a real webview iframe",
+  );
+  let current = page;
+  for (const { selector, index } of chain) {
+    current =
+      index === undefined
+        ? current.frameLocator(selector)
+        : current.frameLocator(selector).nth(index);
+  }
+  return current;
+}
+
 exports.exerciseWebview = async (document) => {
   const port = Number(process.env.DATARAFT_HOST_CDP_PORT);
   assert.ok(Number.isInteger(port) && port > 0, "Host CDP port is required");
@@ -38,7 +85,7 @@ exports.exerciseWebview = async (document) => {
                   .isVisible()
                   .catch(() => false)
               )
-                return frame;
+                return await frameLocator(page, frame);
             }
       }, "visible production contract form").catch((error) => {
         const targets = browser.contexts().flatMap((context) =>
@@ -153,7 +200,7 @@ exports.exerciseWebview = async (document) => {
       document.getText(),
     );
   } catch (error) {
-    const directory = path.resolve(__dirname, "../check/host-webview");
+    const directory = path.resolve(__dirname, "../.vscode-test/host-webview");
     await fs.mkdir(directory, { recursive: true });
     let index = 0;
     for (const context of browser.contexts()) {

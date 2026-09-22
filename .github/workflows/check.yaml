@@ -22,7 +22,7 @@ jobs:
         if: failure()
         with:
           name: webview-failure
-          path: check/host-webview
+          path: .vscode-test/host-webview
           if-no-files-found: ignore
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
