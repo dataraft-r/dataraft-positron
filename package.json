@@ -246,7 +246,8 @@
     "package": "npm run compile && vsce package --no-dependencies --out dataraft-positron.vsix",
     "vscode:prepublish": "npm run compile",
     "test:host": "node test/run-host.cjs",
-    "test:integration": "npm run compile && node --test test/integration/*.test.cjs"
+    "test:integration": "npm run compile && node --test test/integration/*.test.cjs",
+    "test:positron": "npm run compile && node test/run-positron.cjs"
   },
   "dependencies": {
     "@posit-dev/positron": "0.2.10",

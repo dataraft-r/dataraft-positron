@@ -53,7 +53,9 @@ The test layers exercise different boundaries:
 - `npm run test:integration` uses a real persistent R process and the actual bridge package to validate metadata and execution evidence across multiple requests. See `test/integration/README.md` for prerequisites.
 - `npm run test:host` requires a graphical environment or Xvfb and uses the pinned VS Code 1.96.4 extension host. It checks every declared command and the real YAML custom-editor lifecycle: document edits, diagnostics, an unsaved-versus-saved diff and explicit save. A Playwright CDP client drives the production webview inside that Electron host: it fills a contract field and clicks Preview, Discard and Apply, checks that Apply leaves YAML unsaved, and verifies that a concurrent text edit invalidates the pending preview. The loopback debugging port is allocated only by the test runner; no production test hook is installed. It does not simulate a Positron runtime.
 
-A real Positron session is still needed to verify R console selection and the R data viewer in the application. Neither the Node tests nor the VS Code host tests establish that GUI coverage. Follow the [manual Positron acceptance guide](docs/positron-acceptance.md) for that remaining boundary.
+- `npm run test:positron` adds a dedicated native Positron and Ark journey with real command-palette, tree, lineage and YAML clicks, passing/failing R trials, source diagnostics and a bounded native Data Explorer. See [native test setup and scope](test/POSITRON.md). This suite must pass in the dedicated graphical job before claiming native GUI coverage; syntax and unit checks alone do not establish it.
+
+The [manual Positron acceptance guide](docs/positron-acceptance.md) remains necessary for release VSIX checks, other platforms, remote sessions and human usability.
 
 ## R rule diagnostics
 

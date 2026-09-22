@@ -1,0 +1,11 @@
+{
+  "version": "2026.09.1-2",
+  "source_commit": "467ff390dd8b4ffc8972ebb84d9e05a1fd5a4fe2",
+  "release_url": "https://github.com/posit-dev/positron/releases/tag/2026.09.1-2",
+  "checksums_url": "https://cdn.posit.co/positron/releases/checksums/positron-2026.09.1-2-checksums.json",
+  "url": "https://cdn.posit.co/positron/releases/deb/x86_64/Positron-2026.09.1-2-x64.deb",
+  "sha256": "21fa959af68847dbb0c13f3d3ad84665ff156e0af20a80469c4a1d5db018209b",
+  "deb_version": "2026.09.1+2-1788542795",
+  "architecture": "amd64",
+  "executable_size": 217738456
+}

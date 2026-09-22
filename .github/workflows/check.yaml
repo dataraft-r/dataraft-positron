@@ -23,6 +23,7 @@ jobs:
         with:
           name: webview-failure
           path: .vscode-test/host-webview
+          include-hidden-files: true
           if-no-files-found: ignore
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -46,36 +47,42 @@ jobs:
           use-public-rspm: false
       - run: npm ci --ignore-scripts
       - name: Install immutable R integration dependencies
-        shell: Rscript {0}
-        run: |
-          # Ubuntu binaries from the same dated family snapshot avoid compiling DuckDB.
-          options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/2026-09-18"))
-          install.packages(c(
-            "remotes", "DBI", "cli", "dbplyr", "digest", "dplyr", "fs",
-            "jsonlite", "rlang", "tibble", "withr", "duckdb", "bit64", "dm", "yaml"
-          ))
-          # Minimal integration subset of the merged umbrella family-lock.json.
-          # Explicit refs preserve the tested combination without following main.
-          refs <- c(
-            dataraft.core = "6edadf92d570742bcb428bef5aa83f0c6d7b0198",
-            dataraft.lake = "7462a326a1cb65280795cc89217d72b1b9a69d22",
-            dataraft.adapters = "2c770354c67476919e534c6bfe82682e51c1bf51",
-            dataraft.catalog = "11c1f5f3705f83d609250a6c954012a2b430ad75",
-            dataraft.ide = "7fa0d05a82293fffbf9f6a4195a3f73881dbffea"
-          )
-          for (package in names(refs)) {
-            # Hard dependencies are installed above, in dependency order. Disabling
-            # dependency resolution prevents old component Remotes replacing pins.
-            remotes::install_github(
-              paste0("dataraft-r/", package, "@", refs[[package]]),
-              dependencies = FALSE, upgrade = "never", build_vignettes = FALSE
-            )
-            stopifnot(identical(
-              utils::packageDescription(package, fields = "RemoteSha"), refs[[package]]
-            ))
-          }
-          required <- c(names(refs), "duckdb", "bit64", "dm", "yaml")
-          stopifnot(all(vapply(required, requireNamespace, logical(1), quietly = TRUE)))
-          stopifnot(utils::packageVersion("duckdb") >= "1.5.5")
+        run: Rscript test/setup-r.R
       - name: Exercise real R transport and persistent session without skips
         run: npm run test:integration
+  positron:
+    name: Positron 2026.09.1-2 / R 4.5.1 user flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      DATARAFT_EXPECT_R_VERSION: "4.5.1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.18.0"
+          cache: npm
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
+        with:
+          r-version: "4.5.1"
+          use-public-rspm: false
+      - run: npm ci --ignore-scripts
+      - name: Install desktop system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libasound2t64 libatk-bridge2.0-0t64 libgtk-3-0t64 libnss3 libgbm1 libxkbfile1
+      - name: Install immutable R integration dependencies
+        run: Rscript test/setup-r.R
+      - name: Verify and extract the official pinned Positron desktop
+        run: node test/install-positron.cjs
+      - name: Exercise native Positron and its real R runtime
+        run: xvfb-run -a npm run test:positron
+        timeout-minutes: 15
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: positron-runtime-evidence
+          path: .vscode-test/positron-artifacts
+          include-hidden-files: true
+          if-no-files-found: warn
