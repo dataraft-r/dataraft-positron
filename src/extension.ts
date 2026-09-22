@@ -38,6 +38,7 @@ class Controller implements vscode.Disposable {
   private trees = new Map<string, MetadataTree>();
   private views = new Map<string, vscode.TreeView<MetadataNode>>();
   private transport: BridgeTransport;
+  private pendingRequests = new Set<AbortController>();
   private disposables: vscode.Disposable[] = [];
   constructor(
     private context: vscode.ExtensionContext,
@@ -220,6 +221,7 @@ class Controller implements vscode.Disposable {
   }
   private clear(): void {
     this.generation++;
+    for (const request of this.pendingRequests) request.abort();
     this.snapshots.clear();
     this.details.clear();
     for (const tree of this.trees.values()) tree.clear();
@@ -234,6 +236,10 @@ class Controller implements vscode.Disposable {
     const contextHandle = this.contextHandle;
     const session = await this.session();
     const id = session.metadata.sessionId;
+    if (generation !== this.generation || id !== this.sessionId)
+      throw new Error(
+        "Session or context changed while selecting the runtime. Refresh in the selected session.",
+      );
     const state = session.getRuntimeState?.();
     if (state && state !== "idle" && state !== "ready") {
       throw new Error(
@@ -248,7 +254,12 @@ class Controller implements vscode.Disposable {
         cancellable: true,
       },
       async (_progress, token) => {
+        if (generation !== this.generation || id !== this.sessionId)
+          throw new Error(
+            "Session or context changed before the request could start. Refresh in the selected session.",
+          );
         const abort = new AbortController();
+        this.pendingRequests.add(abort);
         const cancel = token.onCancellationRequested(() => abort.abort());
         try {
           const response = await this.transport.request(
@@ -270,6 +281,7 @@ class Controller implements vscode.Disposable {
             );
           return response;
         } finally {
+          this.pendingRequests.delete(abort);
           cancel.dispose();
         }
       },

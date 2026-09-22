@@ -176,7 +176,13 @@ export class BridgeTransport {
       watcher?.close();
       outer?.removeEventListener("abort", abort);
       this.controllers.delete(controller);
-      if (directory) await rm(directory, { recursive: true, force: true });
+      if (directory)
+        await rm(directory, {
+          recursive: true,
+          force: true,
+          maxRetries: 3,
+          retryDelay: 10,
+        });
     }
   }
 }

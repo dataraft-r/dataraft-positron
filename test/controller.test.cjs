@@ -1,151 +1,223 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const Module = require("node:module");
-const fs = require("node:fs/promises");
-const originalLoad = Module._load;
-const disposable = { dispose() {} };
-const deferred = () => {
-  let resolve;
-  const promise = new Promise((r) => (resolve = r));
-  return { promise, resolve };
-};
-test("real controller discards old context responses and does not execute busy or untrusted R", async () => {
-  const commands = new Map(),
-    views = new Map(),
-    errors = [],
-    picked = [];
-  let busy = false,
-    trusted = true,
-    dispatches = 0,
-    blocked;
-  const mock = {
-    EventEmitter: class {
-      event = () => disposable;
-      fire() {}
-      dispose() {}
-    },
-    ThemeIcon: class {},
-    ThemeColor: class {},
-    TreeItem: class {},
-    TreeItemCollapsibleState: { Collapsed: 1, None: 0 },
-    ProgressLocation: { Notification: 15 },
-    Uri: { from: (o) => o },
-    languages: {
-      createDiagnosticCollection: () => ({
-        set() {},
-        delete() {},
-        dispose() {},
-      }),
-    },
-    workspace: {
-      get isTrusted() {
-        return trusted;
-      },
-      getConfiguration: () => ({ get: (_k, d) => d }),
-      onDidGrantWorkspaceTrust: () => disposable,
-      registerTextDocumentContentProvider: () => disposable,
-      onDidCloseTextDocument: () => disposable,
-      onDidChangeTextDocument: () => disposable,
-      onDidSaveTextDocument: () => disposable,
-    },
-    window: {
-      createTreeView: (id, opt) => {
-        const v = { ...disposable, tree: opt.treeDataProvider };
-        views.set(id, v);
-        return v;
-      },
-      registerCustomEditorProvider: () => disposable,
-      showQuickPick: async (choices) => picked.shift()?.(choices) ?? choices[0],
-      showErrorMessage: (e) => {
-        errors.push(e);
-      },
-      withProgress: (_o, fn) =>
-        fn({}, { onCancellationRequested: () => disposable }),
-    },
-    commands: {
-      registerCommand: (name, fn) => {
-        commands.set(name, fn);
-        return disposable;
-      },
-      executeCommand: async () => {},
-    },
+const {
+  harness,
+  deferred,
+  session,
+  empty,
+} = require("./controller-harness.cjs");
+const fixture = (name) =>
+  structuredClone(require("./fixtures/" + name + ".json").data);
+
+test("session picker includes only R consoles and cancelling preserves prior selection", async (t) => {
+  const h = await harness(t);
+  h.sessions = [
+    session("Python", "python"),
+    session("Notebook", "r", "notebook"),
+    session("R-console", "R"),
+  ];
+  h.picks.push(() => undefined);
+  await h.command("selectSession");
+  assert.deepEqual(
+    h.choices[0].map((x) => x.description),
+    ["R-console"],
+  );
+  await h.command("refresh");
+  assert.match(h.errors.at(-1), /Select an existing R console/);
+  assert.equal(h.requests.length, 0);
+  await h.command("selectSession");
+  h.picks.push(() => undefined);
+  await h.command("selectSession");
+  await h.command("refresh");
+  assert.equal(h.requests.length, 5);
+  assert.ok(h.requests.every((req) => req.sessionId === "R-console"));
+});
+
+test("missing, busy and untrusted sessions never execute; ready session recovers", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  h.sessions = [];
+  await h.command("refresh");
+  assert.match(h.errors.at(-1), /no longer available/);
+  h.sessions = [session("R-1", "r", "console", "busy")];
+  await h.command("refresh");
+  assert.match(h.errors.at(-1), /busy/);
+  h.trusted = false;
+  await h.command("refresh");
+  assert.match(h.errors.at(-1), /Trust this workspace/);
+  assert.equal(h.requests.length, 0);
+  h.trusted = true;
+  h.sessions = [session("R-1", "r", "console", "ready")];
+  await h.command("refresh");
+  assert.equal(h.requests.length, 5);
+});
+
+test("controller discards in-flight response after session selection changes", async (t) => {
+  const h = await harness(t),
+    started = deferred(),
+    finish = deferred();
+  await h.command("selectSession");
+  h.respond = async () => {
+    started.resolve();
+    await finish.promise;
+    return empty;
   };
-  const session = {
-    metadata: { sessionId: "R-1", sessionMode: "console" },
-    runtimeMetadata: { languageId: "r", runtimeName: "R" },
-    getRuntimeState: () => (busy ? "busy" : "idle"),
+  const request = h.command("refresh");
+  await started.promise;
+  h.sessions = [session("R-2")];
+  await h.command("selectSession");
+  finish.resolve();
+  await request;
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.views.get("dataraft.products").tree.roots.length, 0);
+  assert.match(h.views.get("dataraft.products").message, /R-2 selected/);
+});
+
+test("cancelled context selection does not switch context or trigger refresh", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  h.picks.push(() => undefined);
+  await h.command("selectContext");
+  assert.deepEqual(
+    h.requests.map((r) => r.operation),
+    ["contexts"],
+  );
+  await h.command("refresh");
+  assert.ok(h.requests.every((r) => r.context === "workspace"));
+  await h.command("selectContext");
+  assert.ok(h.requests.slice(-5).every((r) => r.context === "lake"));
+});
+
+test("explicit trial adds retained result and View sends opaque handle with configured bound", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  const trial = fixture("trial");
+  trial.status = trial.result.status = "completed";
+  trial.result.can_view = true;
+  h.respond = (req) =>
+    req.operation === "trial"
+      ? trial
+      : { handle: req.handle, status: "viewed" };
+  const product = fixture("product");
+  await h.command("trial", { product });
+  assert.equal(h.requests[0].operation, "trial");
+  assert.equal(h.requests[0].handle, product.handle);
+  assert.equal(h.requests[0].limit, 9);
+  assert.equal(
+    h.views.get("dataraft.products").tree.roots[0].product.handle,
+    trial.handle,
+  );
+  await h.command("view", { product: trial.result });
+  assert.equal(h.requests[1].operation, "view");
+  assert.equal(h.requests[1].handle, trial.handle);
+  assert.equal(h.requests[1].row_limit, 7);
+  assert.equal(
+    h.documents.length,
+    1,
+    "only trial opens JSON; View returns no data rows",
+  );
+});
+
+test("ineligible and cancelled product selections do not run trial or View", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  h.picks.push(
+    () => undefined,
+    () => undefined,
+  );
+  await h.command("trial");
+  await h.command("view");
+  const product = { ...fixture("product"), can_trial: false, can_view: false };
+  await h.command("trial", { product });
+  await h.command("view", { product });
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.errors.length, 2);
+});
+
+test("failed refresh is reported and later refresh replaces stale metadata", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  h.respond = () => {
+    throw new Error("private runtime failure");
   };
-  global.acquirePositronApi = () => ({
-    runtime: {
-      getActiveSessions: async () => [session],
-      executeCode: async (...args) => {
-        dispatches++;
-        assert.equal(args[7], "R-1");
-        const req = JSON.parse(
-          Buffer.from(args[1].match(/"([^"]+)"/)[1], "base64"),
-        );
-        if (blocked) {
-          const gate = blocked;
-          blocked = null;
-          gate.started.resolve();
-          await gate.finish.promise;
-        }
-        const value = {
-          contract: 1,
-          generated: "2026-09-22T00:00:00Z",
-          request_id: req.request_id,
-          kind: req.operation,
-          error: null,
-          data: {
-            items:
-              req.operation === "contexts"
-                ? [{ handle: "lake:two", label: "Second lake", kind: "lake" }]
-                : [],
-            truncated: false,
-          },
-        };
-        await fs.writeFile(req.response_path + ".tmp", JSON.stringify(value));
-        await fs.rename(req.response_path + ".tmp", req.response_path);
-      },
-    },
-  });
-  Module._load = function (name, ...args) {
-    return name === "vscode" ? mock : originalLoad.call(this, name, ...args);
+  await h.command("refresh");
+  assert.match(h.errors.at(-1), /Positron rejected/);
+  assert.ok(!h.errors.at(-1).includes("private runtime failure"));
+  assert.match(h.views.get("dataraft.products").message, /may be stale/);
+  h.respond = (req) =>
+    req.operation === "products" ? fixture("products") : empty;
+  await h.command("refresh");
+  assert.ok(h.views.get("dataraft.products").tree.roots.length > 0);
+  assert.match(h.views.get("dataraft.products").message, /Manual refresh only/);
+});
+
+test("session switch prevents already queued Trial from executing in the previous session", async (t) => {
+  const h = await harness(t),
+    started = deferred(),
+    finish = deferred(),
+    queued = deferred();
+  await h.command("selectSession");
+  h.respond = async (req) => {
+    if (req.operation === "products") {
+      started.resolve();
+      await finish.promise;
+      return empty;
+    }
+    return fixture("trial");
   };
-  let activate;
-  try {
-    ({ activate } = require("../dist/extension"));
-  } finally {
-    Module._load = originalLoad;
-  }
-  const context = { subscriptions: [] };
-  activate(context);
-  try {
-    await commands.get("dataraft.selectSession")();
-    busy = true;
-    await commands.get("dataraft.refresh")();
-    assert.equal(dispatches, 0);
-    assert.ok(errors.length);
-    busy = false;
-    trusted = false;
-    await commands.get("dataraft.refresh")();
-    assert.equal(dispatches, 0);
-    trusted = true;
-    const gate = { started: deferred(), finish: deferred() };
-    blocked = gate;
-    const refresh = commands.get("dataraft.refresh")();
-    await gate.started.promise;
-    await commands.get("dataraft.selectSession")();
-    gate.finish.resolve();
-    await refresh;
-    assert.equal(dispatches, 1);
-    assert.equal(views.get("dataraft.products").tree.roots.length, 0);
-    assert.match(views.get("dataraft.products").message, /selected/);
-    await commands.get("dataraft.selectContext")();
-    assert.equal(dispatches, 7);
-    assert.match(views.get("dataraft.products").message, /Second lake/);
-  } finally {
-    for (const item of context.subscriptions) item.dispose();
-    delete global.acquirePositronApi;
-  }
+  const refreshing = h.command("refresh");
+  await started.promise;
+  h.onProgress = (title) => {
+    if (title === "DataRaft: trial") queued.resolve();
+  };
+  const trial = h.command("trial", { product: fixture("product") });
+  await queued.promise;
+  h.sessions = [session("R-1"), session("R-2")];
+  h.picks.push((choices) => choices.find((x) => x.description === "R-2"));
+  await h.command("selectSession");
+  finish.resolve();
+  await Promise.all([refreshing, trial]);
+  assert.deepEqual(
+    h.requests.map((req) => req.operation),
+    ["products"],
+  );
+  assert.equal(h.views.get("dataraft.products").tree.roots.length, 0);
+});
+
+test("session switch during runtime lookup rejects the old Trial before dispatch", async (t) => {
+  const h = await harness(t),
+    started = deferred(),
+    finish = deferred();
+  await h.command("selectSession");
+  h.getSessions = async () => {
+    started.resolve();
+    await finish.promise;
+    return [session("R-1")];
+  };
+  const trial = h.command("trial", { product: fixture("product") });
+  await started.promise;
+  h.getSessions = undefined;
+  h.sessions = [session("R-2")];
+  await h.command("selectSession");
+  finish.resolve();
+  await trial;
+  assert.equal(h.requests.length, 0);
+  assert.match(h.errors.at(-1), /Session or context changed/);
+});
+
+test("session switch before progress callback starts rejects the old Trial", async (t) => {
+  const h = await harness(t),
+    started = deferred(),
+    finish = deferred();
+  await h.command("selectSession");
+  h.progressGate = finish;
+  h.onProgress = () => started.resolve();
+  const trial = h.command("trial", { product: fixture("product") });
+  await started.promise;
+  h.sessions = [session("R-2")];
+  await h.command("selectSession");
+  finish.resolve();
+  await trial;
+  assert.equal(h.requests.length, 0);
+  assert.match(h.errors.at(-1), /Session or context changed/);
 });

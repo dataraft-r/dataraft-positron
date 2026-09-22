@@ -285,3 +285,76 @@ test("canonical schema rejects per-kind additions and preserves nullable metadat
     /Invalid/,
   );
 });
+
+test("dispatch rejection is redacted, cleans its directory, and does not poison queued work", async () => {
+  const paths = [],
+    started = deferred(),
+    failed = deferred();
+  let calls = 0;
+  const bridge = new BridgeTransport(async (code) => {
+    const req = decode(code);
+    paths.push(req.response_path);
+    if (++calls === 1) {
+      started.resolve();
+      await failed.promise;
+      throw new Error("private connection password");
+    }
+    await atomic(req);
+  }, 1000);
+  try {
+    const first = bridge.request("R", { operation: "products" });
+    const rejection = assert.rejects(first, (error) => {
+      assert.match(error.message, /Positron rejected/);
+      assert.ok(!error.message.includes("password"));
+      return true;
+    });
+    await started.promise;
+    const next = bridge.request("R", { operation: "contexts" });
+    failed.resolve();
+    await rejection;
+    assert.equal((await next).kind, "contexts");
+    assert.equal(calls, 2);
+    for (const path of paths)
+      await assert.rejects(fs.stat(dirname(path)), { code: "ENOENT" });
+  } finally {
+    bridge.dispose();
+  }
+});
+
+test("active cancellation cleans its directory and a subsequent request succeeds", async () => {
+  const started = deferred(),
+    paths = [];
+  let calls = 0;
+  const bridge = new BridgeTransport(async (code) => {
+    const req = decode(code);
+    paths.push(req.response_path);
+    if (++calls === 1) started.resolve();
+    else await atomic(req);
+  }, 1000);
+  try {
+    const abort = new AbortController();
+    const first = bridge.request("R", { operation: "products" }, abort.signal);
+    const rejection = assert.rejects(first, /cancelled/);
+    await started.promise;
+    abort.abort();
+    await rejection;
+    assert.equal(
+      (await bridge.request("R", { operation: "contexts" })).kind,
+      "contexts",
+    );
+    for (const path of paths)
+      await assert.rejects(fs.stat(dirname(path)), { code: "ENOENT" });
+  } finally {
+    bridge.dispose();
+  }
+});
+
+test("cleanup retries transient nonempty-directory failures from a late writer", async () => {
+  const { execFile } = require("node:child_process");
+  const { promisify } = require("node:util");
+  await promisify(execFile)(
+    process.execPath,
+    [join(__dirname, "cleanup-race.cjs")],
+    { timeout: 10000 },
+  );
+});
