@@ -432,3 +432,66 @@ test("v2 diagnostics validate independently without accepting protocol drift in 
     1,
   );
 });
+
+test("lineage ranks long chains independently of edge order", () => {
+  const { lineageRanks } = require("../dist/render");
+  const nodes = Array.from({ length: 500 }, (_, i) => ({
+    id: `p${i}`,
+    kind: "product",
+  }));
+  const edges = nodes
+    .slice(1)
+    .map((node, i) => ({
+      from: nodes[i].id,
+      to: node.id,
+      relation: "derived",
+    }));
+  const graph = { nodes, edges, truncated: false };
+  const ranks = lineageRanks(graph);
+  assert.equal(ranks.get("p499"), 499);
+  assert.deepEqual(
+    lineageRanks({
+      ...graph,
+      nodes: [...nodes].reverse(),
+      edges: [...edges].reverse(),
+    }),
+    ranks,
+  );
+  const html = lineageHtml(graph, "2026-09-22T00:00:00Z", "test");
+  const positions = [
+    ...html.matchAll(/transform="translate\((\d+) (\d+)\)"/g),
+  ].map((match) => `${match[1]},${match[2]}`);
+  assert.equal(new Set(positions).size, 500);
+});
+
+test("lineage condenses cycles, keeps disconnected products and routes self edges", () => {
+  const { lineageRanks } = require("../dist/render");
+  const graph = {
+    nodes: ["source", "a", "b", "target", "isolated"].map((id) => ({
+      id,
+      kind: "product",
+    })),
+    edges: [
+      ["source", "a"],
+      ["a", "b"],
+      ["b", "a"],
+      ["b", "target"],
+      ["isolated", "isolated"],
+    ].map(([from, to]) => ({ from, to, relation: "derived" })),
+    truncated: false,
+  };
+  assert.deepEqual(Object.fromEntries(lineageRanks(graph)), {
+    a: 1,
+    b: 1,
+    isolated: 0,
+    source: 0,
+    target: 2,
+  });
+  const html = lineageHtml(graph, "2026-09-22T00:00:00Z", "test");
+  assert.equal((html.match(/class="node"/g) || []).length, 5);
+  assert.equal((html.match(/class="edge"/g) || []).length, 5);
+  assert.deepEqual(
+    [...lineageRanks({ nodes: [], edges: [], truncated: false })],
+    [],
+  );
+});

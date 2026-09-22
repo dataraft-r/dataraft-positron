@@ -6,8 +6,8 @@ const { join } = require("node:path");
 const { tmpdir } = require("node:os");
 const Ajv2020 = require("ajv/dist/2020");
 const addFormats = require("ajv-formats");
-const schema = require("../../schemas/bridge-v1.json");
-const diagnosticsSchema = require("../../schemas/bridge-v2.json");
+const schema = require("../../schemas/bridge-metadata-v1.json");
+const diagnosticsSchema = require("../../schemas/bridge-diagnostics-v1.json");
 const { createHash } = require("node:crypto");
 const { BridgeTransport } = require("../../dist/transport");
 

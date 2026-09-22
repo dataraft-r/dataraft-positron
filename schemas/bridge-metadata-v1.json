@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dataraft-r.github.io/dataraft.ide/schema/bridge-v1.json",
-  "title": "DataRaft IDE envelope v1",
+  "$id": "https://dataraft-r.github.io/dataraft.ide/schema/bridge-metadata-v1.json",
+  "title": "DataRaft IDE metadata channel v1",
   "type": "object",
   "additionalProperties": false,
   "required": [

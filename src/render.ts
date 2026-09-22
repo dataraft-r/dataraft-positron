@@ -18,34 +18,93 @@ export function htmlDocument(
  :root {color-scheme:light dark} body{font:var(--vscode-font-size) var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);padding:1.25rem;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.1rem}button,input,select,textarea{font:inherit;color:var(--vscode-input-foreground);background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);padding:.4rem .65rem}button{cursor:pointer;color:var(--vscode-button-foreground);background:var(--vscode-button-background);border-color:var(--vscode-button-border)}button:hover{background:var(--vscode-button-hoverBackground)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--vscode-focusBorder);outline-offset:2px}.muted{color:var(--vscode-descriptionForeground)}table{border-collapse:collapse}td,th{text-align:left;vertical-align:top;padding:.5rem;border-bottom:1px solid var(--vscode-panel-border)}label{display:block;margin:.7rem 0}.graph{position:relative;overflow:auto;border:1px solid var(--vscode-panel-border)}.graph svg{display:block}.edge{stroke:var(--vscode-foreground);fill:none;stroke-width:1.5}.edge-arrow{fill:var(--vscode-foreground)}.node rect{fill:var(--vscode-editor-background);stroke:var(--vscode-focusBorder);stroke-width:1.5}.node text{fill:var(--vscode-foreground);font-size:13px}.node{cursor:pointer}.node:focus{outline:none}.node:focus rect{stroke-width:3}.warning{border-left:3px solid var(--vscode-editorWarning-foreground);padding-left:1rem}pre{white-space:pre-wrap;word-break:break-word}a{color:var(--vscode-textLink-foreground)}
  </style></head><body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ""}</body></html>`;
 }
+/** Rank strongly connected components, then their condensation DAG.
+ * Sorting makes positions independent of registry row/edge ordering. Cycles
+ * share a column, while every inter-component edge points strictly right.
+ */
+export function lineageRanks(graph: Graph): Map<string, number> {
+  const ids = graph.nodes.map((node) => node.id).sort();
+  const adjacency = new Map(ids.map((id) => [id, new Set<string>()]));
+  for (const edge of graph.edges) {
+    if (adjacency.has(edge.to)) adjacency.get(edge.from)?.add(edge.to);
+  }
+  let next = 0;
+  const indices = new Map<string, number>();
+  const low = new Map<string, number>();
+  const stack: string[] = [];
+  const active = new Set<string>();
+  const components: string[][] = [];
+  const visit = (id: string): void => {
+    indices.set(id, next);
+    low.set(id, next++);
+    stack.push(id);
+    active.add(id);
+    for (const target of [...adjacency.get(id)!].sort()) {
+      if (!indices.has(target)) {
+        visit(target);
+        low.set(id, Math.min(low.get(id)!, low.get(target)!));
+      } else if (active.has(target)) {
+        low.set(id, Math.min(low.get(id)!, indices.get(target)!));
+      }
+    }
+    if (low.get(id) === indices.get(id)) {
+      const component: string[] = [];
+      let member: string;
+      do {
+        member = stack.pop()!;
+        active.delete(member);
+        component.push(member);
+      } while (member !== id);
+      components.push(component.sort());
+    }
+  };
+  for (const id of ids) if (!indices.has(id)) visit(id);
+  const membership = new Map<string, number>();
+  components.forEach((members, index) =>
+    members.forEach((id) => membership.set(id, index)),
+  );
+  const successors = components.map(() => new Set<number>());
+  const incoming = components.map(() => 0);
+  for (const [from, targets] of adjacency)
+    for (const to of targets) {
+      const a = membership.get(from)!,
+        b = membership.get(to)!;
+      if (a !== b && !successors[a]!.has(b)) {
+        successors[a]!.add(b);
+        incoming[b] = incoming[b]! + 1;
+      }
+    }
+  const ranks = components.map(() => 0);
+  const ready = incoming.flatMap((count, index) =>
+    count === 0 ? [index] : [],
+  );
+  for (let cursor = 0; cursor < ready.length; cursor++) {
+    const source = ready[cursor]!;
+    for (const target of successors[source]!) {
+      ranks[target] = Math.max(ranks[target]!, ranks[source]! + 1);
+      incoming[target] = incoming[target]! - 1;
+      if (incoming[target] === 0) ready.push(target);
+    }
+  }
+  return new Map(ids.map((id) => [id, ranks[membership.get(id)!]!]));
+}
 export function lineageHtml(
   graph: Graph,
   generated: string,
   nonce: string,
 ): string {
-  // A stable breadth ranking provides direction without hiding cycles or nodes.
-  const rank = new Map<string, number>(graph.nodes.map((n) => [n.id, 0]));
-  for (let i = 0; i < Math.min(graph.nodes.length, 8); i++) {
-    let changed = false;
-    for (const edge of graph.edges) {
-      const a = rank.get(edge.from) ?? 0,
-        b = rank.get(edge.to) ?? 0;
-      if (a >= b && a < 7 && edge.from !== edge.to) {
-        rank.set(edge.to, a + 1);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
+  const rank = lineageRanks(graph);
   const counts = new Map<number, number>();
   const locations = new Map<string, { x: number; y: number }>();
-  for (const node of graph.nodes) {
+  for (const node of [...graph.nodes].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  )) {
     const column = rank.get(node.id) ?? 0,
       row = counts.get(column) ?? 0;
     counts.set(column, row + 1);
     locations.set(node.id, { x: 20 + column * 220, y: 20 + row * 82 });
   }
-  const width = Math.max(300, ...[...locations.values()].map((p) => p.x + 210));
+  const width = Math.max(300, ...[...locations.values()].map((p) => p.x + 230));
   const height = Math.max(100, ...[...locations.values()].map((p) => p.y + 68));
   const lines = graph.edges
     .map((edge) => {
@@ -56,7 +115,11 @@ export function lineageHtml(
         sy = a.y + 25,
         ex = b.x - 6,
         ey = b.y + 25;
-      return `<path class="edge" d="M${sx},${sy} C${sx + 35},${sy} ${ex - 35},${ey} ${ex},${ey}" marker-end="url(#arrow)"><title>${escapeHtml(edge.from)} to ${escapeHtml(edge.to)}: ${escapeHtml(edge.relation)}</title></path>`;
+      const curve =
+        a.x === b.x
+          ? `M${sx},${sy} C${sx + 32},${sy - 30} ${sx + 32},${ey + 30} ${b.x + 186},${ey}`
+          : `M${sx},${sy} C${sx + 35},${sy} ${ex - 35},${ey} ${ex},${ey}`;
+      return `<path class="edge" d="${curve}" marker-end="url(#arrow)"><title>${escapeHtml(edge.from)} to ${escapeHtml(edge.to)}: ${escapeHtml(edge.relation)}</title></path>`;
     })
     .join("");
   const nodes = graph.nodes
