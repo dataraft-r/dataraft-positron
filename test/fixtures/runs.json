@@ -1,0 +1,1 @@
+{"contract":1,"generated":"2026-09-22T04:45:28.427Z","kind":"runs","request_id":"fixture-runs","data":{"items":[{"run_id":"r7b48dc6a05010fe5e3e745c4","asset":"orders","status":"blocked","started_at":"2026-09-22T04:45:27.450176Z","finished_at":"2026-09-22T04:45:27.744275Z","release_id":null}],"truncated":false},"error":null}

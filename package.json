@@ -1,0 +1,255 @@
+{
+  "name": "dataraft-positron",
+  "displayName": "DataRaft",
+  "description": "Inspect governed data products and quality evidence in Positron; edit contract YAML in VS Code.",
+  "version": "0.1.0",
+  "publisher": "dataraft-r",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dataraft-r/dataraft-positron.git"
+  },
+  "engines": {
+    "vscode": "^1.96.0",
+    "node": ">=22"
+  },
+  "categories": [
+    "Data Science",
+    "Visualization"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Only offline metadata and YAML editing are available. R requests require workspace trust."
+    },
+    "virtualWorkspaces": false
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:yaml"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "dataraft.selectSession",
+        "title": "Select R Session",
+        "category": "DataRaft",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "dataraft.selectContext",
+        "title": "Select Workspace or Lake",
+        "category": "DataRaft"
+      },
+      {
+        "command": "dataraft.refresh",
+        "title": "Refresh Metadata",
+        "category": "DataRaft",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dataraft.openMetadata",
+        "title": "Open Metadata JSON",
+        "category": "DataRaft",
+        "icon": "$(json)"
+      },
+      {
+        "command": "dataraft.inspect",
+        "title": "Inspect Product",
+        "category": "DataRaft",
+        "icon": "$(inspect)"
+      },
+      {
+        "command": "dataraft.trial",
+        "title": "Trial Product",
+        "category": "DataRaft",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "dataraft.view",
+        "title": "View Bounded Rows in R",
+        "category": "DataRaft",
+        "icon": "$(table)"
+      },
+      {
+        "command": "dataraft.lineage",
+        "title": "Show Directed Lineage",
+        "category": "DataRaft",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "dataraft.reports",
+        "title": "Show Frozen Report Metadata",
+        "category": "DataRaft"
+      },
+      {
+        "command": "dataraft.editYaml",
+        "title": "Open Contract YAML Editor",
+        "category": "DataRaft"
+      },
+      {
+        "command": "dataraft.yamlDiff",
+        "title": "Compare YAML with Saved File",
+        "category": "DataRaft"
+      },
+      {
+        "command": "dataraft.validateContract",
+        "title": "Validate Saved ODCS Contract in R",
+        "category": "DataRaft"
+      },
+      {
+        "command": "dataraft.profile",
+        "title": "Profile Selected Workspace Table",
+        "category": "DataRaft"
+      },
+      {
+        "command": "dataraft.sampleQuality",
+        "title": "Check Bounded Table Sample against Saved Contract",
+        "category": "DataRaft"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dataraft",
+          "title": "DataRaft",
+          "icon": "media/raft.svg"
+        }
+      ]
+    },
+    "views": {
+      "dataraft": [
+        {
+          "id": "dataraft.products",
+          "name": "Data Products"
+        },
+        {
+          "id": "dataraft.quality",
+          "name": "Quality"
+        },
+        {
+          "id": "dataraft.runs",
+          "name": "Runs"
+        },
+        {
+          "id": "dataraft.freshness",
+          "name": "Freshness"
+        },
+        {
+          "id": "dataraft.incidents",
+          "name": "Incidents"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "dataraft.products",
+        "contents": "[Select an R session](command:dataraft.selectSession), then refresh metadata.\n\nIn VS Code, [open metadata JSON](command:dataraft.openMetadata) or [edit contract YAML](command:dataraft.editYaml).",
+        "when": "!dataraft.hasMetadata"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "dataraft.refresh",
+          "when": "view =~ /^dataraft\\./",
+          "group": "navigation"
+        },
+        {
+          "command": "dataraft.selectSession",
+          "when": "view == dataraft.products",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dataraft.inspect",
+          "when": "viewItem == dataraft.product",
+          "group": "inline"
+        },
+        {
+          "command": "dataraft.trial",
+          "when": "viewItem == dataraft.product",
+          "group": "execution"
+        },
+        {
+          "command": "dataraft.view",
+          "when": "viewItem == dataraft.product",
+          "group": "execution"
+        },
+        {
+          "command": "dataraft.lineage",
+          "when": "viewItem == dataraft.product",
+          "group": "inspection"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "dataraft.contractYaml",
+        "displayName": "DataRaft Contract YAML",
+        "selector": [
+          {
+            "filenamePattern": "*.contract.yaml"
+          },
+          {
+            "filenamePattern": "*.dataraft.yaml"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "configuration": {
+      "title": "DataRaft",
+      "properties": {
+        "dataraft.requestTimeoutSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 300,
+          "description": "Maximum time to await a requested R response. Cancellation stops waiting, not an already running R computation."
+        },
+        "dataraft.maximumItems": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Maximum metadata records per request."
+        },
+        "dataraft.maximumRows": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Maximum rows requested by the explicit View command. Rows stay inside R."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc --noEmit && node build.mjs",
+    "test": "npm run compile && node --test test/*.test.cjs",
+    "package": "npm run compile && vsce package --no-dependencies --out dataraft-positron.vsix",
+    "vscode:prepublish": "npm run compile",
+    "test:host": "node test/run-host.cjs",
+    "test:integration": "npm run compile && node --test test/integration/*.test.cjs"
+  },
+  "dependencies": {
+    "@posit-dev/positron": "0.2.10",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/vscode": "1.96.0",
+    "@vscode/test-electron": "2.5.2",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3"
+  }
+}

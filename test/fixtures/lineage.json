@@ -1,0 +1,1 @@
+{"contract":1,"generated":"2026-09-22T04:45:28.257Z","kind":"lineage","request_id":"fixture-lineage","data":{"nodes":[{"id":"orders","kind":"product"},{"id":"orders/orders","kind":"table"}],"edges":[{"from":"orders/orders","to":"orders","relation":"depends_on"}],"truncated":false},"error":null}
