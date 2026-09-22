@@ -17,7 +17,7 @@ vapply(c("dataraft.core", "dataraft.ide", "dataraft.adapters", "yaml"),
 .libPaths()
 ```
 
-Use installed candidate R packages, including `dataraft.ide` 0.1.0.9002 or newer.
+Use installed candidate R packages, including `dataraft.ide` 0.1.0.9003 or newer.
 The extension accesses the independent diagnostics channel through the public
 `dataraft.ide::ide_request()` boundary; operation helpers are internal.
 Install the extension on the **same host as R**;

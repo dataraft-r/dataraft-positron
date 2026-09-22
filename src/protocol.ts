@@ -149,10 +149,16 @@ export function validateEnvelope(
 export function items<T>(response: Envelope): T[] {
   return (response.data as { items: T[] }).items;
 }
-export function rBridgeCode(request: Request): string {
+export function rBridgeCode(request: Request, responseRoot?: string): string {
   const text = JSON.stringify(request);
   if (Buffer.byteLength(text) > 16384)
     throw new Error("DataRaft request exceeds 16 KiB.");
   const encoded = Buffer.from(text, "utf8").toString("base64");
-  return `dataraft.ide::ide_request("${encoded}")`;
+  // A trusted transport argument, never a field supplied by the request JSON.
+  // Encode UTF-8 bytes as integer literals so paths cannot become R syntax.
+  const context =
+    responseRoot === undefined
+      ? ""
+      : `, context = dataraft.ide::ide_context(response_root = rawToChar(as.raw(c(${[...Buffer.from(responseRoot, "utf8")].join(",")}))))`;
+  return `dataraft.ide::ide_request("${encoded}"${context})`;
 }

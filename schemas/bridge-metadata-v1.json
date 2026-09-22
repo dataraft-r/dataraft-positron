@@ -704,6 +704,7 @@
       "properties": {
         "nodes": {
           "type": "array",
+          "maxItems": 500,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -723,6 +724,7 @@
         },
         "edges": {
           "type": "array",
+          "maxItems": 500,
           "items": {
             "type": "object",
             "additionalProperties": false,

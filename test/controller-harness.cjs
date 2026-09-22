@@ -34,6 +34,7 @@ async function harness(t) {
   );
   for (const [name] of savedModules) delete require.cache[name];
   const h = {
+    panels: [],
     diagnosticCollections: new Map(),
     documentChanges: [],
     watchers: [],
@@ -67,6 +68,7 @@ async function harness(t) {
     TreeItem: class {},
     TreeItemCollapsibleState: { Collapsed: 1, None: 0 },
     ProgressLocation: { Notification: 15 },
+    ViewColumn: { Beside: 2 },
     Uri: {
       from: (value) => value,
       file: (value) => ({
@@ -155,6 +157,33 @@ async function harness(t) {
       },
     },
     window: {
+      createWebviewPanel: () => {
+        const messages = new Set(),
+          closed = new Set();
+        const panel = {
+          messages,
+          closed,
+          disposed: false,
+          webview: {
+            html: "",
+            onDidReceiveMessage: (fn) => {
+              messages.add(fn);
+              return { dispose: () => messages.delete(fn) };
+            },
+          },
+          onDidDispose: (fn) => {
+            closed.add(fn);
+            return { dispose: () => closed.delete(fn) };
+          },
+          dispose() {
+            if (this.disposed) return;
+            this.disposed = true;
+            for (const fn of [...closed]) fn();
+          },
+        };
+        h.panels.push(panel);
+        return panel;
+      },
       createTreeView: (id, options) => {
         const view = { ...disposable, tree: options.treeDataProvider };
         h.views.set(id, view);
@@ -236,6 +265,9 @@ async function harness(t) {
   } finally {
     Module._load = originalLoad;
   }
+  h.dispose = () => {
+    for (const item of context.subscriptions) item.dispose();
+  };
   h.workspace = mock.workspace;
   h.command = (name, ...args) => h.commands.get("dataraft." + name)(...args);
   t.after(async () => {
