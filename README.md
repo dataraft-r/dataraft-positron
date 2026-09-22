@@ -27,6 +27,8 @@ Refresh is manual. Expanding an uncached product requests its detail. No backgro
 
 **Open Contract YAML Editor** edits ODCS 3.2 YAML as the authoritative document. Edits preserve comments and unknown metadata. The editor proposes a diff before applying a version-checked workspace edit, which remains unsaved for your review. Dirty buffers and external changes invalidate pending edits. Diagnostics point to parsed YAML source ranges. The portable `dr_contract_yaml()` metadata export is not an executable ODCS contract.
 
+The saved-file baseline comes from opening the editor and explicit saves. If another program changes the file, preserve any unsaved work and review those external changes, then close and reopen the contract editor before previewing further edits. Reopening establishes a fresh disk baseline; the extension does not automatically save over the changed file.
+
 **Validate Saved ODCS Contract in R** uses `dr_contract_from_odcs()` against the saved file. **Profile Selected Workspace Table** shows inferred schema metadata; **Check Bounded Table Sample against Saved Contract** explicitly checks a bounded in-memory sample and returns counts. Neither command transfers table cells. Sampling does not establish full-dataset quality.
 
 ## VS Code and remote workspaces

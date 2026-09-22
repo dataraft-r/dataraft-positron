@@ -262,7 +262,10 @@ test(
           applied++;
           current = edit.text;
           version++;
+          // VS Code can emit the text change before publishing isDirty=true.
+          dirty = false;
           documentChanged({ document: doc });
+          dirty = true;
           applyStarted?.();
           if (pendingApply) await pendingApply;
           return true;
@@ -401,6 +404,12 @@ test(
 
     pendingDiff = undefined;
     await preview();
+    assert.match(
+      panel.webview.html,
+      /Apply preview to document/,
+      "unsaved apply must not replace the actual disk baseline",
+    );
+    assert.equal(disk, yaml);
     let finishApply;
     pendingApply = new Promise((resolve) => {
       finishApply = resolve;

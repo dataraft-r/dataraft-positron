@@ -50,7 +50,7 @@ export function assertSnapshot(
     );
   if (expected.diskHash !== current.diskHash)
     throw new Error(
-      "The saved file changed outside this editor. Reconcile the external change before editing.",
+      "The saved file changed outside this editor. Preserve unsaved work and review the external change, then close and reopen the contract editor before editing.",
     );
 }
 function read(text: string): { doc: Document.Parsed; issues: Issue[] } {

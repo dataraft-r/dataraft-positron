@@ -117,8 +117,8 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
       const disposables = [
         vscode.workspace.onDidChangeTextDocument((event) => {
           if (event.document.uri.toString() === document.uri.toString()) {
-            if (!document.isDirty)
-              diskBaseline = contentHash(document.getText());
+            // Change events may precede the dirty flag becoming true. Only an
+            // explicit save can advance the initial authoritative disk baseline.
             proposal = undefined;
             sampleIssues = [];
             update();
