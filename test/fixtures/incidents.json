@@ -1,0 +1,1 @@
+{"contract":1,"generated":"2026-09-22T04:45:28.490Z","kind":"incidents","request_id":"fixture-incidents","data":{"items":[{"run_id":"r7b48dc6a05010fe5e3e745c4","asset":"orders","rule":"rule-1","status":"failed","severity":null,"engine":"r","stage":"candidate","n_failed":1,"n_total":2}],"truncated":false},"error":null}
