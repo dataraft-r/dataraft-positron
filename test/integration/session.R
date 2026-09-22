@@ -70,7 +70,7 @@ rule_environment <- new.env(parent = baseenv())
 source(rule_file, local = rule_environment, keep.source = TRUE, encoding = "UTF-8")
 workspace$diagnostic_product <- dr_product("diagnostic.orders", data.frame(amount = -1)) |>
   dr_add_quality(dr_quality_rule(rule_environment$positive, name = "positive"))
-context <- ide_context(workspace)
+context <- ide_context(workspace, response_root = root)
 
 input <- file("stdin", open = "r")
 repeat {

@@ -34,31 +34,44 @@ export function lineageRanks(graph: Graph): Map<string, number> {
   const stack: string[] = [];
   const active = new Set<string>();
   const components: string[][] = [];
-  const visit = (id: string): void => {
+  // Explicit DFS frames keep even adversarially deep offline graphs stack safe.
+  type Frame = { id: string; targets: string[]; cursor: number };
+  const enter = (id: string): Frame => {
     indices.set(id, next);
     low.set(id, next++);
     stack.push(id);
     active.add(id);
-    for (const target of [...adjacency.get(id)!].sort()) {
-      if (!indices.has(target)) {
-        visit(target);
-        low.set(id, Math.min(low.get(id)!, low.get(target)!));
-      } else if (active.has(target)) {
-        low.set(id, Math.min(low.get(id)!, indices.get(target)!));
-      }
-    }
-    if (low.get(id) === indices.get(id)) {
-      const component: string[] = [];
-      let member: string;
-      do {
-        member = stack.pop()!;
-        active.delete(member);
-        component.push(member);
-      } while (member !== id);
-      components.push(component.sort());
-    }
+    return { id, targets: [...adjacency.get(id)!].sort(), cursor: 0 };
   };
-  for (const id of ids) if (!indices.has(id)) visit(id);
+  for (const root of ids) {
+    if (indices.has(root)) continue;
+    const frames = [enter(root)];
+    while (frames.length) {
+      const frame = frames[frames.length - 1]!;
+      const id = frame.id;
+      if (frame.cursor < frame.targets.length) {
+        const target = frame.targets[frame.cursor++]!;
+        if (!indices.has(target)) frames.push(enter(target));
+        else if (active.has(target))
+          low.set(id, Math.min(low.get(id)!, indices.get(target)!));
+        continue;
+      }
+      if (low.get(id) === indices.get(id)) {
+        const component: string[] = [];
+        let member: string;
+        do {
+          member = stack.pop()!;
+          active.delete(member);
+          component.push(member);
+        } while (member !== id);
+        components.push(component.sort());
+      }
+      frames.pop();
+      const parent = frames[frames.length - 1];
+      if (parent)
+        low.set(parent.id, Math.min(low.get(parent.id)!, low.get(id)!));
+    }
+  }
   const membership = new Map<string, number>();
   components.forEach((members, index) =>
     members.forEach((id) => membership.set(id, index)),
@@ -93,6 +106,10 @@ export function lineageHtml(
   generated: string,
   nonce: string,
 ): string {
+  if (graph.nodes.length > 500 || graph.edges.length > 500)
+    throw new Error(
+      "DataRaft lineage supports at most 500 nodes and 500 edges. Request a smaller snapshot.",
+    );
   const rank = lineageRanks(graph);
   const counts = new Map<number, number>();
   const locations = new Map<string, { x: number; y: number }>();

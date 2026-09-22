@@ -159,7 +159,10 @@ export class BridgeTransport {
           return;
         }
         try {
-          const queued = this.dispatch(rBridgeCode(request), sessionId);
+          const queued = this.dispatch(
+            rBridgeCode(request, directory),
+            sessionId,
+          );
           Promise.resolve(queued).then(
             () => void read(),
             () =>

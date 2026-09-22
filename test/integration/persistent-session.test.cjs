@@ -64,11 +64,15 @@ test(
       (code, sessionId) => {
         assert.equal(sessionId, "persistent-r-fixture");
         const match = code.match(
-          /^dataraft\.ide::ide_request\("([A-Za-z0-9+/=]+)"\)$/,
+          /^dataraft\.ide::ide_request\("([A-Za-z0-9+/=]+)", context = dataraft\.ide::ide_context\(response_root = rawToChar\(as.raw\(c\(([0-9,]+)\)\)\)\)\)$/,
         );
         assert.ok(match, "only the fixed encoded R entry point is sent");
         const request = JSON.parse(
           Buffer.from(match[1], "base64").toString("utf8"),
+        );
+        assert.equal(
+          Buffer.from(match[2].split(",").map(Number)).toString("utf8"),
+          require("node:path").dirname(request.response_path),
         );
         const validator =
           request.version === 2 ? validateDiagnosticsRequest : validateRequest;

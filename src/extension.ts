@@ -43,6 +43,8 @@ class Controller implements vscode.Disposable {
   private ruleDiagnostics = new RuleDiagnostics();
   private diagnosticsGeneration = 0;
   private disposables: vscode.Disposable[] = [];
+  private disposed = false;
+  private lineagePanels = new Set<vscode.WebviewPanel>();
   constructor(
     private context: vscode.ExtensionContext,
     private api: PositronApi | undefined,
@@ -138,7 +140,11 @@ class Controller implements vscode.Disposable {
     );
   }
   dispose(): void {
+    this.disposed = true;
     this.transport.dispose();
+    for (const panel of this.lineagePanels) panel.dispose();
+    this.lineagePanels.clear();
+    this.snapshots.clear();
     for (const item of this.disposables) item.dispose();
   }
   private async session(
@@ -513,44 +519,48 @@ class Controller implements vscode.Disposable {
       throw new Error(
         "This offline snapshot does not contain lineage. Open a lineage metadata JSON file.",
       );
+    if (this.disposed) return;
     this.snapshots.set("lineage", response);
     const graph = response.data as Graph;
+    const html = lineageHtml(
+      graph,
+      response.generated,
+      randomBytes(18).toString("base64"),
+    );
     const panel = vscode.window.createWebviewPanel(
       "dataraft.lineage",
       "DataRaft Lineage",
       vscode.ViewColumn.Beside,
       { enableScripts: true, localResourceRoots: [] },
     );
-    panel.webview.html = lineageHtml(
-      graph,
-      response.generated,
-      randomBytes(18).toString("base64"),
-    );
-    panel.webview.onDidReceiveMessage(
-      async (message) => {
-        if (
-          !message ||
-          message.type !== "focus" ||
-          !Number.isInteger(message.index)
-        )
-          return;
-        const item = graph.nodes[message.index];
-        if (!item) return;
-        const tree = this.trees.get("products")!;
-        const found = tree.roots.find((n) => n.product?.id === item.id);
-        if (found)
-          await this.views
-            .get("products")!
-            .reveal(found, { select: true, focus: true, expand: true });
-        else
-          vscode.window.setStatusBarMessage(
-            "This lineage node has no product in the current product snapshot.",
-            5000,
-          );
-      },
-      undefined,
-      this.disposables,
-    );
+    this.lineagePanels.add(panel);
+    panel.webview.html = html;
+    const listener = panel.webview.onDidReceiveMessage(async (message) => {
+      if (
+        !message ||
+        message.type !== "focus" ||
+        !Number.isInteger(message.index)
+      )
+        return;
+      const item = graph.nodes[message.index];
+      if (!item) return;
+      const tree = this.trees.get("products")!;
+      const found = tree.roots.find((n) => n.product?.id === item.id);
+      if (found)
+        await this.views
+          .get("products")!
+          .reveal(found, { select: true, focus: true, expand: true });
+      else
+        vscode.window.setStatusBarMessage(
+          "This lineage node has no product in the current product snapshot.",
+          5000,
+        );
+    });
+    const closed = panel.onDidDispose(() => {
+      listener.dispose();
+      closed.dispose();
+      this.lineagePanels.delete(panel);
+    });
   }
   private async reports(): Promise<void> {
     const response = this.offline

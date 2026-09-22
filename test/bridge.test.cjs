@@ -21,7 +21,9 @@ const response = (
 const decode = (code) =>
   JSON.parse(
     Buffer.from(
-      code.match(/^dataraft\.ide::ide_request\("([A-Za-z0-9+/=]+)"\)$/)[1],
+      code.match(
+        /^dataraft\.ide::ide_request\("([A-Za-z0-9+/=]+)"(?:, context = .*)?\)$/,
+      )[1],
       "base64",
     ).toString(),
   );
@@ -439,13 +441,11 @@ test("lineage ranks long chains independently of edge order", () => {
     id: `p${i}`,
     kind: "product",
   }));
-  const edges = nodes
-    .slice(1)
-    .map((node, i) => ({
-      from: nodes[i].id,
-      to: node.id,
-      relation: "derived",
-    }));
+  const edges = nodes.slice(1).map((node, i) => ({
+    from: nodes[i].id,
+    to: node.id,
+    relation: "derived",
+  }));
   const graph = { nodes, edges, truncated: false };
   const ranks = lineageRanks(graph);
   assert.equal(ranks.get("p499"), 499);
@@ -494,4 +494,100 @@ test("lineage condenses cycles, keeps disconnected products and routes self edge
     [...lineageRanks({ nodes: [], edges: [], truncated: false })],
     [],
   );
+});
+
+test("deep lineage SCC traversal is stack safe, while offline schema and renderer bound graphs", () => {
+  const { lineageRanks } = require("../dist/render");
+  const graph = {
+    nodes: Array.from({ length: 8000 }, (_, i) => ({
+      id: String(i),
+      kind: "product",
+    })),
+    edges: Array.from({ length: 7999 }, (_, i) => ({
+      from: String(i),
+      to: String(i + 1),
+      relation: "depends_on",
+    })),
+    truncated: false,
+  };
+  assert.equal(lineageRanks(graph).get("7999"), 7999);
+  graph.edges.push({ from: "7999", to: "0", relation: "cycle" });
+  assert.deepEqual(new Set(lineageRanks(graph).values()), new Set([0]));
+  for (const count of [501, 10000]) {
+    const oversized = {
+      nodes: Array.from({ length: count }, (_, i) => ({
+        id: String(i),
+        kind: "product",
+      })),
+      edges: [],
+      truncated: false,
+    };
+    assert.throws(
+      () =>
+        validateEnvelope(
+          response(
+            { operation: "lineage", request_id: "bound" },
+            "lineage",
+            oversized,
+          ),
+        ),
+      /Invalid/,
+    );
+    assert.throws(
+      () => lineageHtml(oversized, "2026-09-22T00:00:00Z", "test"),
+      /500 nodes/,
+    );
+  }
+  const bounded = {
+    nodes: graph.nodes.slice(0, 500),
+    edges: graph.edges.slice(0, 499),
+    truncated: true,
+  };
+  assert.doesNotThrow(() =>
+    validateEnvelope(
+      response(
+        { operation: "lineage", request_id: "bound" },
+        "lineage",
+        bounded,
+      ),
+    ),
+  );
+  assert.match(
+    lineageHtml(bounded, "2026-09-22T00:00:00Z", "test"),
+    /This graph is truncated/,
+  );
+  bounded.edges = Array(501).fill(bounded.edges[0]);
+  assert.throws(
+    () =>
+      validateEnvelope(
+        response(
+          { operation: "lineage", request_id: "bound" },
+          "lineage",
+          bounded,
+        ),
+      ),
+    /Invalid/,
+  );
+  assert.throws(
+    () => lineageHtml(bounded, "2026-09-22T00:00:00Z", "test"),
+    /500 edges/,
+  );
+});
+
+test("response root is a separately encoded trusted R argument", () => {
+  const root = 'C:\\private\\雪\");system("bad")#';
+  const request = {
+    version: 1,
+    operation: "products",
+    request_id: "root",
+    response_path: "/tmp/response.json",
+  };
+  const code = rBridgeCode(request, root);
+  assert.deepEqual(decode(code), request);
+  const bytes = code.match(/rawToChar\(as.raw\(c\(([0-9,]+)\)\)\)/)[1];
+  assert.equal(
+    Buffer.from(bytes.split(",").map(Number)).toString("utf8"),
+    root,
+  );
+  assert.ok(!code.includes('system("bad")'));
 });

@@ -221,3 +221,48 @@ test("session switch before progress callback starts rejects the old Trial", asy
   assert.equal(h.requests.length, 0);
   assert.match(h.errors.at(-1), /Session or context changed/);
 });
+
+test("lineage panels release listeners on close and all remaining panels on deactivation", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  const originalRespond = h.respond;
+  h.respond = (req) =>
+    req.operation === "lineage" ? fixture("lineage") : originalRespond(req);
+  for (let i = 0; i < 10; i++) {
+    await h.command("lineage");
+    const panel = h.panels.at(-1);
+    assert.equal(panel.messages.size, 1);
+    panel.dispose();
+    assert.equal(panel.messages.size, 0);
+    assert.equal(panel.closed.size, 0);
+  }
+  await h.command("lineage");
+  await h.command("lineage");
+  assert.equal(h.errors.length, 0);
+  h.dispose();
+  for (const panel of h.panels) {
+    assert.equal(panel.disposed, true);
+    assert.equal(panel.messages.size, 0);
+    assert.equal(panel.closed.size, 0);
+  }
+});
+
+test("deactivation while lineage is pending never opens a late panel", async (t) => {
+  const h = await harness(t);
+  await h.command("selectSession");
+  const started = deferred(),
+    finish = deferred(),
+    originalRespond = h.respond;
+  h.respond = async (req) => {
+    if (req.operation !== "lineage") return originalRespond(req);
+    started.resolve();
+    await finish.promise;
+    return fixture("lineage");
+  };
+  const command = h.command("lineage");
+  await started.promise;
+  h.dispose();
+  finish.resolve();
+  await command;
+  assert.equal(h.panels.length, 0);
+});
