@@ -36,7 +36,7 @@ test(
         "--args",
         root,
       ],
-      { stdio: ["pipe", "ignore", "pipe"], env: process.env },
+      { cwd: root, stdio: ["pipe", "ignore", "pipe"], env: process.env },
     );
     let stderr = "";
     child.stderr.on("data", (data) => {
