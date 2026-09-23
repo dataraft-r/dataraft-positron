@@ -29,7 +29,7 @@ refs <- c(
   dataraft.lake = "82574476d3198343eeb1363f4a7a969efa4f233b",
   dataraft.adapters = "ab28d72c14a6276317a0c45d5aeebd0572bd87a3",
   dataraft.catalog = "e5f34db0ab22792e549d73e0febb1a04a10b7530",
-  dataraft.ide = "57849070c9c35f8818c58a148c6c6deb3c336836"
+  dataraft.ide = "a288659802535789309eb2878ce5d225c24e3234"
 )
 for (package in names(refs)) {
   # Hard dependencies are installed above, in dependency order. Disabling
