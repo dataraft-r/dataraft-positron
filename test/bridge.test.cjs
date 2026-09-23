@@ -591,3 +591,20 @@ test("response root is a separately encoded trusted R argument", () => {
   );
   assert.ok(!code.includes('system("bad")'));
 });
+
+test("runtime input cannot redirect the response channel and the queue recovers", async () => {
+  let calls = 0;
+  const bridge = new BridgeTransport(async (code) => {
+    calls++;
+    await atomic(decode(code));
+  }, 500);
+  try {
+    await assert.rejects(bridge.request("R", {
+      operation: "products", response_path: join(tmpdir(), "escape.json"),
+    }), /managed by the transport/);
+    assert.equal(calls, 0);
+    const result = await bridge.request("R", { operation: "products" });
+    assert.equal(result.error, null);
+    assert.equal(calls, 1);
+  } finally { bridge.dispose(); }
+});

@@ -15,16 +15,12 @@ workspace$orders <- dr_product(
   data.frame(id = 1:3, amount = c(25, 50, 75)),
   contract = dr_contract(
     "orders.contract",
-    "1.0.0",
-    "Risk",
-    "Orders",
-    "one order",
-    c(id = "integer", amount = "numeric"),
+    version = "1.0.0",
+    columns = c(id = "integer", amount = "numeric"),
     key = "id"
   )
 )
-workspace$workflow <- dr_workflow() |>
-  dr_add_product(dr_product("workflow")) |>
+workspace$workflow <- dr_product("workflow") |>
   dr_add_source(function() stop("SOURCE_BODY_MUST_NOT_LEAK"))
 workspace$model <- dr_product(
   "portfolio",

@@ -135,7 +135,7 @@ test(
       assert.ok(orders);
       assert.ok(
         workflow,
-        "actual dr_product_workflow is discoverable without execution",
+        "ordinary product composition is discoverable without execution",
       );
       assert.ok(
         !products.items.some((x) =>
@@ -197,6 +197,13 @@ test(
         ["id", "owner", "description"],
       );
       const contractFile = join(root, "sample.contract.yaml");
+      const outside = await mkdtemp(join(tmpdir(), "dataraft-outside-"));
+      t.after(() => rm(outside, { recursive: true, force: true }));
+      const outsideContract = join(outside, "outside.yaml");
+      await writeFile(outsideContract, await readFile(contractFile));
+      await request({ operation: "validate_contract", file_path: outsideContract }, "unsafe_path");
+      // The next request must still complete after an actual R containment error.
+
       const contract = await request({
         operation: "validate_contract",
         file_path: contractFile,
@@ -323,8 +330,8 @@ test(
       );
       assert.equal(
         responseCount,
-        28,
-        "25 existing responses plus sourced-rule trial, v2 diagnostics and stale-source rejection",
+        29,
+        "28 existing responses plus containment rejection and queue recovery",
       );
       t.diagnostic(
         `${responseCount} real R responses passed file transport, canonical JSON Schema and Node protocol checks`,

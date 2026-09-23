@@ -54,6 +54,9 @@ export class BridgeTransport {
     outer?: AbortSignal,
   ): Promise<Envelope> {
     if (this.disposed) throw new Error("DataRaft transport is disposed.");
+    if ("response_path" in input || "request_id" in input) {
+      throw new Error("DataRaft response paths and request IDs are managed by the transport.");
+    }
     if (outer?.aborted) throw new Error("DataRaft request cancelled.");
     const controller = new AbortController();
     this.controllers.add(controller);

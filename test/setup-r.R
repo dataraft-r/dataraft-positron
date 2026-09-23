@@ -14,6 +14,7 @@ install.packages(c(
   "fs",
   "jsonlite",
   "rlang",
+  "lifecycle",
   "tibble",
   "withr",
   "duckdb",
@@ -24,11 +25,11 @@ install.packages(c(
 # Minimal integration subset of the merged umbrella family-lock.json.
 # Explicit refs preserve the tested combination without following main.
 refs <- c(
-  dataraft.core = "871982715c6000c8f1018456576e6cd517a5b7a6",
-  dataraft.lake = "7462a326a1cb65280795cc89217d72b1b9a69d22",
-  dataraft.adapters = "2c770354c67476919e534c6bfe82682e51c1bf51",
-  dataraft.catalog = "11c1f5f3705f83d609250a6c954012a2b430ad75",
-  dataraft.ide = "dc34be1c9bd94d52f619a010ee577cf45ee7381a"
+  dataraft.core = "d6626eafc8eec7355f7ae226d6e319f9d7d99371",
+  dataraft.lake = "82574476d3198343eeb1363f4a7a969efa4f233b",
+  dataraft.adapters = "ab28d72c14a6276317a0c45d5aeebd0572bd87a3",
+  dataraft.catalog = "e5f34db0ab22792e549d73e0febb1a04a10b7530",
+  dataraft.ide = "a288659802535789309eb2878ce5d225c24e3234"
 )
 for (package in names(refs)) {
   # Hard dependencies are installed above, in dependency order. Disabling
