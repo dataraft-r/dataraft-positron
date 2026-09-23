@@ -101,7 +101,7 @@ exports.run = async () => {
     result <- tryCatch({
       source(${JSON.stringify(fixture)}, local=.GlobalEnv, keep.source=TRUE, encoding="UTF-8")
       list(ok=TRUE, r=as.character(getRversion()), pid=Sys.getpid(),
-        packages=lapply(c("dataraft.core", "dataraft.lake", "dataraft.adapters", "dataraft.catalog", "dataraft.ide", "duckdb"), function(p) list(name=p, version=as.character(packageVersion(p)))))
+        packages=lapply(c("dataraft.core", "dataraft.lake", "dataraft.adapters", "dataraft.ide", "duckdb"), function(p) list(name=p, version=as.character(packageVersion(p)))))
     }, error=function(e) list(ok=FALSE, message=conditionMessage(e)))
     temporary <- paste0(${JSON.stringify(ack)}, ".tmp")
     jsonlite::write_json(result, temporary, auto_unbox=TRUE)
