@@ -164,7 +164,10 @@ exports.run = async () => {
     await page.setViewportSize({ width: 1600, height: 1000 });
     await vscode.commands.executeCommand("workbench.action.closePanel");
     const captureFeature = async (name, frame) => {
-      if (frame) await frame.locator("[data-field='[\"name\"]']").scrollIntoViewIfNeeded();
+      if (frame) {
+        if (name === "yaml-preview") await frame.getByRole("button", {name: "Apply preview to document", exact: true}).scrollIntoViewIfNeeded();
+        else await frame.locator("[data-field='[\"name\"]']").scrollIntoViewIfNeeded();
+      }
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await page.screenshot({ path: path.join(artifacts, `feature-${name}.png`) });
     };

@@ -133,6 +133,7 @@ exports.exerciseWebview = async (document, existingBrowser, captureFeature) => {
           }
         }
       }, "actual proposed-edit diff with form value");
+      if (captureFeature && name === "Applied form change") await captureFeature("yaml-diff");
       const updated = await editor();
       await updated
         .getByRole("button", { name: "Apply preview to document", exact: true })
