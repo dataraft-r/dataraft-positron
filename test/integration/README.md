@@ -3,7 +3,7 @@
 Run `npm run test:integration` from the extension repository after installing its
 Node dependencies and these R packages:
 
-- `dataraft.core`, `dataraft.lake`, `dataraft.catalog`, `dataraft.adapters`, and diagnostics-capable `dataraft.ide` (>= 0.1.0.9003)
+- `dataraft.core`, `dataraft.lake`, `dataraft.adapters`, and diagnostics-capable `dataraft.ide` (>= 0.1.0.9003)
 - `duckdb`, `bit64`, `dm`, `yaml`, and their package dependencies
 
 The command starts a real persistent R subprocess. It fails if R or a required

@@ -21,7 +21,7 @@ Use **Extensions: Install from VSIX** and select `dataraft-positron.vsix`. Live 
 
 Refresh is manual. Expanding an uncached product requests its detail. No background polling, automatic trials, approvals or publishing occur. A busy R session rejects execution requests. Switching sessions invalidates responses still in flight.
 
-**Trial Product** explicitly runs user code and source reads through `dr_trial`; the configured destination is not published. **View Bounded Rows in R** requests a bounded existing table or trial result in the R data viewer. Rows never pass through this extension. **Show Frozen Report Metadata** lists report identifiers and timestamps. Directed lineage supports keyboard focus and selecting a node focuses its matching product in the tree.
+**Trial Product** explicitly runs user code and source reads through `dr_run(x, write = FALSE)`; the configured destination is not published. **View Bounded Rows in R** requests a bounded existing table or trial result in the R data viewer. Rows never pass through this extension. **Show Frozen Report Metadata** lists report identifiers and timestamps. Directed lineage supports keyboard focus and selecting a node focuses its matching product in the tree.
 
 ## Contract YAML
 
