@@ -161,6 +161,13 @@ exports.run = async () => {
         )
           return candidate;
     }, "actual Positron workbench");
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await vscode.commands.executeCommand("workbench.action.closePanel");
+    const captureFeature = async (name, frame) => {
+      if (frame) await frame.locator("[data-field='[\"name\"]']").scrollIntoViewIfNeeded();
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await page.screenshot({ path: path.join(artifacts, `feature-${name}.png`) });
+    };
     context = page.context();
     context.setDefaultTimeout(30000);
     await context.tracing.start({ screenshots: true, snapshots: true });
@@ -217,6 +224,7 @@ exports.run = async () => {
         { exact: true },
       )
       .waitFor();
+    await captureFeature("select-session");
     await quickRows.filter({ hasText: sessionId }).click();
     // Reveal the view container through the workbench command. All tested
     // DataRaft actions below still use actual command-palette and tree clicks.
@@ -249,6 +257,7 @@ exports.run = async () => {
         ),
       "product tree inspection JSON",
     );
+    await captureFeature("inspect-product");
     checkpoint("session selection, refresh and product tree inspection");
 
     for (const [id, status] of [
@@ -267,6 +276,7 @@ exports.run = async () => {
       );
       assert.equal(result.data.status, status);
       assert.match(result.data.handle, /^result:/);
+      await captureFeature(`trial-${status}`);
       checkpoint(`${id}: ${status}`);
     }
     await idle();
@@ -289,6 +299,7 @@ exports.run = async () => {
     );
     assert.equal(quality.n_failed, 1);
     assert.equal(quality.n_total, 2);
+    await captureFeature("quality-evidence");
     checkpoint("quality tree reports one failure in two rows");
 
     await idle();
@@ -350,6 +361,7 @@ exports.run = async () => {
           return button.first();
       }
     }, "real directed lineage webview node");
+    await captureFeature("directed-lineage");
     await lineageButton.click();
     await page
       .getByRole("treeitem", { selected: true })
@@ -405,7 +417,7 @@ exports.run = async () => {
           ),
       "active production custom-editor tab for the exact YAML document",
     );
-    await require("./host-webview.cjs").exerciseWebview(document, browser);
+    await require("./host-webview.cjs").exerciseWebview(document, browser, captureFeature);
     checkpoint(
       "native webview buttons preview, discard, apply and reject stale YAML edits",
     );
