@@ -425,15 +425,15 @@ exports.run = async () => {
     await stage();
     checkpoint("six-table portfolio and downstream products in native overview");
 
-    await page.getByRole("treeitem")
-      .filter({ hasText: "portfolio.relational_model" }).first().click();
+    await command("Inspect Product");
+    await pick("portfolio.relational_model");
     const model = await dashboard("portfolio.relational_model");
     assert.match(await model.locator("main").innerText(), /Portfolio Analytics/);
     await capture("portfolio-model.png");
     checkpoint("relational table model visible in native product dashboard");
 
-    await page.getByRole("treeitem")
-      .filter({ hasText: "portfolio.lapse_rate_by_channel" }).first().click();
+    await command("Inspect Product");
+    await pick("portfolio.lapse_rate_by_channel");
     const kpi = await dashboard("portfolio.lapse_rate_by_channel", "reporting");
     const kpiText = await kpi.locator("main").innerText();
     assert.match(kpiText, /lapse\.rate\.v1/);
