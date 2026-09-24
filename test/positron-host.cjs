@@ -397,6 +397,7 @@ exports.run = async () => {
     );
     const document = await vscode.workspace.openTextDocument(yamlUri);
     await vscode.window.showTextDocument(document);
+    await stage();
     await command("Open Contract YAML Editor");
     await until(
       () =>
@@ -411,7 +412,6 @@ exports.run = async () => {
           ),
       "active production custom-editor tab for the exact YAML document",
     );
-    await stage();
     await require("./host-webview.cjs").exerciseWebview(
       document, browser, (name) => capture(name, false),
     );
