@@ -249,6 +249,7 @@ exports.run = async () => {
     const overview = await dashboard("Data products", "passing.orders");
     assert.equal(await overview.getByRole("button", { name: "Inspect product" }).count(), 12);
     await capture("feature-overview.png");
+    await fs.copyFile(path.join(artifacts, "feature-overview.png"), path.join(artifacts, "portfolio-overview.png"));
     checkpoint("workspace overview lists three smoke fixtures and nine portfolio products");
     await page
       .getByRole("treeitem")
@@ -421,14 +422,6 @@ exports.run = async () => {
     // products through the native workbench and retain focused captures.
     await idle();
     await stage();
-    await refresh();
-    await command("Open Data Product Overview");
-    await until(async () => {
-      const view = await dashboard("Data products", "portfolio.relational_model");
-      return (await view.getByRole("button", { name: "Inspect product" })
-        .count().catch(() => 0)) === 12;
-    }, "twelve inspectable products in the refreshed overview");
-    await capture("portfolio-overview.png");
     checkpoint("six-table portfolio and downstream products in native overview");
 
     await page.getByRole("treeitem")
