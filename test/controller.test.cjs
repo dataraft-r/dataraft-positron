@@ -52,6 +52,23 @@ test("missing, busy and untrusted sessions never execute; ready session recovers
   assert.equal(h.requests.length, 5);
 });
 
+test("refresh waits for Ark to become idle between completed metadata responses", async (t) => {
+  const h = await harness(t);
+  let busy = false;
+  h.sessions = [{ ...session(), getRuntimeState: () => busy ? "busy" : "idle" }];
+  h.respond = (req) => {
+    if (req.operation === "products") {
+      busy = true;
+      setTimeout(() => { busy = false; }, 50);
+    }
+    return empty;
+  };
+  await h.command("selectSession");
+  await h.command("refresh");
+  assert.equal(h.requests.length, 5);
+  assert.deepEqual(h.errors, []);
+});
+
 test("controller discards in-flight response after session selection changes", async (t) => {
   const h = await harness(t),
     started = deferred(),

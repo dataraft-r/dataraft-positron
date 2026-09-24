@@ -25,3 +25,16 @@ governed_orders <- dr_product(
     "warehouse", dataraft.adapters::dr_target_rds(file.path(native_root, "governed.rds")),
     sla = dr_sla(available_by = "08:00", timezone = "UTC")
   ))
+
+# The larger portfolio is the same installed example exercised by R package tests.
+# Copy it into the isolated workspace so every displayed product has inspectable
+# source and the screenshots retain a reproducible definition.
+portfolio_source <- system.file("examples", "portfolio-case.R", package = "dataraft",
+                                mustWork = TRUE)
+stopifnot(file.copy(portfolio_source, file.path(native_root, "portfolio-case.R")))
+source(file.path(native_root, "portfolio-case.R"), local = TRUE,
+       keep.source = TRUE, encoding = "UTF-8")
+portfolio <- portfolio_case(file.path(native_root, "portfolio-outputs"))
+for (name in names(portfolio$products)) {
+  assign(paste0("portfolio_", name), portfolio$products[[name]], envir = .GlobalEnv)
+}

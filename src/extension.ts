@@ -351,6 +351,19 @@ class Controller implements vscode.Disposable {
     ] as const) {
       try {
         if (this.generation !== generation) return;
+        // The response file is written before Ark reports the R console idle.
+        // A subsequent metadata request can otherwise be rejected as busy,
+        // leaving one of the five panes stale after a successful refresh.
+        if (operation !== "products") {
+          const runtime = await this.session();
+          const deadline = Date.now() + 5000;
+          while (!["idle", "ready"].includes(runtime.getRuntimeState?.() ?? "idle")) {
+            if (this.generation !== generation) return;
+            if (Date.now() >= deadline)
+              throw new Error("The selected R session is busy. Wait for it to become idle.");
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+        }
         this.apply(await this.request({ operation }));
       } catch (e) {
         if (this.generation !== generation) return;

@@ -31,6 +31,14 @@ A Playwright CDP connection drives the actual Electron workbench:
    product is selected in the tree.
 8. Exercise the production YAML form buttons: Preview, Discard, Apply, and stale
    preview rejection after a concurrent document edit.
+9. Use the installed six-table insurance portfolio example loaded during setup
+   into the same R console. Verify twelve inspectable products overall, inspect
+   its relational model and lapse-rate contract, owner policy, output port and
+   08:00 UTC SLA. Trial the channel lapse-rate product to `completed`, then
+   trial the deliberately invalid cash feed to `blocked`. Inspect the
+   `nonnegative_cash` evidence showing one failure among 108 payments, and
+   focus the lapse-rate product in the production lineage graph. The capture
+   artifact includes six `portfolio-*.png` images from these actions.
 
 Workbench view-focus commands reveal panes as setup. The actions under test use
 actual palette, picker, tree and webview clicks. Completion waits observe runtime

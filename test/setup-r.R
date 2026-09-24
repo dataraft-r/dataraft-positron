@@ -25,10 +25,11 @@ install.packages(c(
 # Minimal integration subset of the merged umbrella family-lock.json.
 # Explicit refs preserve the tested combination without following main.
 refs <- c(
-  dataraft.core = "a94e8e11c46cedfc4ac9640a73ac7caae5cae5c9",
+  dataraft.core = "b753ea7c40dd88df9c3448912941e4ee9e6e352f",
   dataraft.lake = "6fb0a57d4e4b3157636933594c64b3637184a51e",
   dataraft.adapters = "8af12ffb0a45569f9326ed4905b50c6c2498ac11",
-  dataraft.ide = "63f6958774311999ce5a0f5ae5a2bce2d561a65b"
+  dataraft.metrics = "60d37099d78ac54689dcaa1f2ed75f11ddb5cd72",
+  dataraft.ide = "99e42ab9f6e25e16c4afa25b766e64fe8d67774f"
 )
 for (package in names(refs)) {
   # Hard dependencies are installed above, in dependency order. Disabling
@@ -44,7 +45,13 @@ for (package in names(refs)) {
     refs[[package]]
   ))
 }
-required <- c(names(refs), "duckdb", "bit64", "dm", "yaml")
+# Install the exact merged umbrella revision that owns the regression fixture.
+portfolio_ref <- Sys.getenv("DATARAFT_PORTFOLIO_REF", "eee51685456ef8519fd5486375b52d7a2a699342")
+remotes::install_github(
+  paste0("dataraft-r/dataraft@", portfolio_ref),
+  dependencies = FALSE, upgrade = "never", build_vignettes = FALSE
+)
+required <- c(names(refs), "dataraft", "duckdb", "bit64", "dm", "yaml")
 stopifnot(all(vapply(required, requireNamespace, logical(1), quietly = TRUE)))
 stopifnot(utils::packageVersion("duckdb") >= "1.5.5")
 

@@ -247,9 +247,11 @@ exports.run = async () => {
     await refresh();
     await command("Open Data Product Overview");
     const overview = await dashboard("Data products", "passing.orders");
-    assert.equal(await overview.getByRole("button", { name: "Inspect product" }).count(), 3);
+    assert.equal(await overview.getByRole("button", { name: "Inspect product" }).count(), 12);
     await capture("feature-overview.png");
-    checkpoint("workspace overview lists three products with inspect actions");
+    await overview.getByText("portfolio.lapse_rate_by_channel", { exact: true }).scrollIntoViewIfNeeded();
+    await capture("portfolio-overview.png", false);
+    checkpoint("workspace overview lists three smoke fixtures and nine portfolio products");
     await page
       .getByRole("treeitem")
       .filter({ hasText: "passing.orders" })
@@ -395,6 +397,7 @@ exports.run = async () => {
     );
     const document = await vscode.workspace.openTextDocument(yamlUri);
     await vscode.window.showTextDocument(document);
+    await stage();
     await command("Open Contract YAML Editor");
     await until(
       () =>
@@ -409,13 +412,78 @@ exports.run = async () => {
           ),
       "active production custom-editor tab for the exact YAML document",
     );
-    await stage();
     await require("./host-webview.cjs").exerciseWebview(
       document, browser, (name) => capture(name, false),
     );
     checkpoint(
       "native webview buttons preview, discard, apply and reject stale YAML edits",
     );
+    // A realistic six-table insurance portfolio is defined by the same
+    // installed example that the R test suite executes. Drive its actual
+    // products through the native workbench and retain focused captures.
+    await idle();
+    await stage();
+    checkpoint("six-table portfolio and downstream products in native overview");
+
+    await command("Inspect Product");
+    await pick("portfolio.relational_model");
+    const model = await dashboard("portfolio.relational_model");
+    assert.match(await model.locator("main").innerText(), /Portfolio Analytics/);
+    await capture("portfolio-model.png");
+    checkpoint("relational table model visible in native product dashboard");
+
+    await command("Inspect Product");
+    await pick("portfolio.lapse_rate_by_channel");
+    const kpi = await dashboard("portfolio.lapse_rate_by_channel", "reporting");
+    const kpiText = await kpi.locator("main").innerText();
+    assert.match(kpiText, /lapse\.rate\.v1/);
+    assert.match(kpiText, /named_owner/);
+    assert.match(kpiText, /08:00 UTC/);
+    await capture("portfolio-product-contract.png");
+    checkpoint("KPI contract, policy, SLA and output port are readable");
+
+    await idle();
+    await command("Trial Product");
+    await pick("portfolio.lapse_rate_by_channel");
+    const kpiResult = await dashboard("portfolio.lapse_rate_by_channel", "completed");
+    assert.equal(await kpiResult.locator(".badge").innerText(), "completed");
+    await capture("portfolio-kpi-trial.png");
+    checkpoint("monthly lapse rate completes from related portfolio products");
+
+    await idle();
+    await command("Trial Product");
+    await pick("portfolio.invalid_cash_receipts");
+    const blockedCash = await dashboard("portfolio.invalid_cash_receipts", "blocked");
+    assert.equal(await blockedCash.locator(".badge").innerText(), "blocked");
+    await refresh();
+    await vscode.commands.executeCommand("dataraft.quality.focus");
+    const cashFailure = page.getByRole("treeitem")
+      .filter({ hasText: "portfolio.invalid_cash_receipts" })
+      .filter({ hasText: /failed/ });
+    await cashFailure.first().click();
+    const cashEvidence = await dashboard("portfolio.invalid_cash_receipts", "nonnegative_cash");
+    const cashText = await cashEvidence.locator("main").innerText();
+    assert.match(cashText, /n failed\s+1/i);
+    assert.match(cashText, /n total\s+108/i);
+    await capture("portfolio-quality-failure.png");
+    checkpoint("one invalid receipt is isolated among 108 records");
+
+    await idle();
+    await command("Show Directed Lineage");
+    await stage();
+    const portfolioNode = await until(async () => {
+      for (const frame of page.frames()) {
+        const node = frame.getByRole("button", {
+          name: "Focus product portfolio.lapse_rate_by_channel", exact: true,
+        });
+        if (await node.isVisible().catch(() => false)) return node;
+      }
+    }, "portfolio lineage node");
+    await portfolioNode.focus();
+    await portfolioNode.press("Enter");
+    await capture("portfolio-lineage.png");
+    checkpoint("product dependency graph links inputs to the lapse KPI");
+
     assert.ok(
       (await api.runtime.getActiveSessions()).some(
         (item) => item.metadata.sessionId === sessionId,

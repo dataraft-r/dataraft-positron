@@ -5,7 +5,7 @@ const { chromium } = require("playwright-core");
 const vscode = require("vscode");
 
 async function until(get, label) {
-  const deadline = Date.now() + 15000;
+  const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     try {
       const value = await get();
@@ -111,7 +111,21 @@ exports.exerciseWebview = async (document, existingBrowser, capture = async () =
         document.uri,
         "dataraft.contractYaml",
       );
-      return visibleEditor();
+      try {
+        return await visibleEditor();
+      } catch (firstError) {
+        // Positron can create the custom-editor tab while its webview renderer
+        // remains blank. Reopening this isolated test document creates a fresh
+        // iframe, then requires the real form to be visible before proceeding.
+        console.warn("Reopen blank native contract editor:", firstError.message);
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+        await vscode.commands.executeCommand(
+          "vscode.openWith",
+          document.uri,
+          "dataraft.contractYaml",
+        );
+        return visibleEditor();
+      }
     };
     const field = (frame) => frame.locator("[data-field='[\"name\"]']");
     const preview = async (name) => {
