@@ -483,7 +483,8 @@ exports.run = async () => {
     }, "portfolio lineage node");
     await portfolioNode.focus();
     await portfolioNode.press("Enter");
-    await vscode.commands.executeCommand("notifications.clearAll");
+    if ((await vscode.commands.getCommands(true)).includes("notifications.clearAll"))
+      await vscode.commands.executeCommand("notifications.clearAll");
     await capture("portfolio-lineage.png");
     checkpoint("product dependency graph links inputs to the lapse KPI");
 
