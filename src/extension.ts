@@ -553,7 +553,7 @@ class Controller implements vscode.Disposable {
       ),
     );
     vscode.window.setStatusBarMessage(
-      "Trial completed. No target was published.",
+      `Trial ${data.status}. No target was published.`,
       5000,
     );
   }
