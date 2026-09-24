@@ -343,8 +343,8 @@ test(
       );
       assert.equal(
         responseCount,
-        29,
-        "28 existing responses plus containment rejection and queue recovery",
+        30,
+        "29 existing responses plus containment rejection and queue recovery",
       );
       t.diagnostic(
         `${responseCount} real R responses passed file transport, canonical JSON Schema and Node protocol checks`,

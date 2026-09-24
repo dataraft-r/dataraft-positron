@@ -171,7 +171,10 @@ exports.run = async () => {
     );
     const command = async (title) => {
       await page.keyboard.press("Escape");
-      await page.keyboard.press("Control+Shift+P");
+      // A dashboard iframe may own keyboard focus. Open the real workbench
+      // palette explicitly, then drive its visible input and result by clicks.
+      await vscode.commands.executeCommand("workbench.action.showCommands");
+      await quickInput.waitFor({ state: "visible" });
       await quickInput.fill(`>DataRaft: ${title}`);
       await quickRows
         .filter({ hasText: `DataRaft: ${title}` })
