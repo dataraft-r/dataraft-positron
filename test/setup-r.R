@@ -45,9 +45,8 @@ for (package in names(refs)) {
     refs[[package]]
   ))
 }
-# The portfolio fixture is installed by the coordinated umbrella PR. Once
-# merged, replace this branch ref with its immutable commit SHA.
-portfolio_ref <- Sys.getenv("DATARAFT_PORTFOLIO_REF", "feature/portfolio-acceptance-20260924")
+# Install the exact merged umbrella revision that owns the regression fixture.
+portfolio_ref <- Sys.getenv("DATARAFT_PORTFOLIO_REF", "eee51685456ef8519fd5486375b52d7a2a699342")
 remotes::install_github(
   paste0("dataraft-r/dataraft@", portfolio_ref),
   dependencies = FALSE, upgrade = "never", build_vignettes = FALSE
