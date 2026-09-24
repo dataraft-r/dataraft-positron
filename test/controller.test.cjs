@@ -113,8 +113,12 @@ test("explicit trial adds retained result and View sends opaque handle with conf
   assert.equal(h.requests[1].row_limit, 7);
   assert.equal(
     h.documents.length,
-    1,
-    "only trial opens JSON; View returns no data rows",
+    0,
+    "trial and View never open raw JSON or transfer data rows",
+  );
+  assert.match(
+    h.panels.at(-1).webview.html,
+    /Trial result|Trial: completed|Data product/,
   );
 });
 

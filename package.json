@@ -51,6 +51,12 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "dataraft.overview",
+        "title": "Open Data Product Overview",
+        "category": "DataRaft",
+        "icon": "$(dashboard)"
+      },
+      {
         "command": "dataraft.openMetadata",
         "title": "Open Metadata JSON",
         "category": "DataRaft",
@@ -159,6 +165,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "dataraft.overview",
+          "when": "view == dataraft.products",
+          "group": "navigation"
+        },
         {
           "command": "dataraft.refresh",
           "when": "view =~ /^dataraft\\./",

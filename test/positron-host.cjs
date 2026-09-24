@@ -25,17 +25,6 @@ async function jsonFile(file) {
     throw error;
   }
 }
-async function currentJson(predicate) {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || editor.document.languageId !== "json") return undefined;
-  let value;
-  try {
-    value = JSON.parse(editor.document.getText());
-  } catch {
-    return undefined;
-  }
-  return predicate(value) ? value : undefined;
-}
 exports.run = async () => {
   const workspace = process.env.DATARAFT_POSITRON_WORKSPACE;
   const artifacts = process.env.DATARAFT_POSITRON_ARTIFACTS;
@@ -164,6 +153,16 @@ exports.run = async () => {
     context = page.context();
     context.setDefaultTimeout(30000);
     await context.tracing.start({ screenshots: true, snapshots: true });
+    const dashboard = async (heading, expectedText) =>
+      until(async () => {
+        for (const frame of page.frames()) {
+          const title = frame.getByRole("heading", { name: heading, exact: true });
+          if (!(await title.isVisible().catch(() => false))) continue;
+          if (expectedText && !(await frame.locator("body").innerText()).includes(expectedText)) continue;
+          return await require("./host-webview.cjs").frameLocator(page, frame);
+        }
+      }, `visible structured dashboard ${heading}`);
+    const capture = (name) => page.screenshot({ path: path.join(artifacts, name) });
     const quickInput = page.locator(
       ".quick-input-widget .quick-input-box input",
     );
@@ -217,6 +216,7 @@ exports.run = async () => {
         { exact: true },
       )
       .waitFor();
+    await capture("feature-select-session.png");
     await quickRows.filter({ hasText: sessionId }).click();
     // Reveal the view container through the workbench command. All tested
     // DataRaft actions below still use actual command-palette and tree clicks.
@@ -230,26 +230,34 @@ exports.run = async () => {
     ])
       await vscode.commands.executeCommand(`dataraft.${kind}.focus`);
     await refresh();
+    await command("Open Data Product Overview");
+    const overview = await dashboard("Data products", "passing.orders");
+    assert.equal(await overview.getByRole("button", { name: "Inspect product" }).count(), 3);
+    await capture("feature-overview.png");
+    checkpoint("workspace overview lists three products with inspect actions");
     await page
       .getByRole("treeitem")
       .filter({ hasText: "passing.orders" })
       .first()
       .waitFor();
     await idle();
-    // Click an actual product tree row, and inspect the document it opens.
+    // Click an actual product tree row and inspect the rendered native webview.
     await page
       .getByRole("treeitem")
       .filter({ hasText: "passing.orders" })
       .first()
       .click();
-    await until(
-      () =>
-        currentJson(
-          (value) => value.id === "passing.orders" && value.kind === "product",
-        ),
-      "product tree inspection JSON",
-    );
+    const passing = await dashboard("passing.orders", "Quality rules");
+    assert.equal(await passing.getByRole("button", { name: "Trial without publishing" }).count(), 1);
+    await capture("feature-inspect-product.png");
     checkpoint("session selection, refresh and product tree inspection");
+    await page.getByRole("treeitem").filter({ hasText: "governed.orders" }).first().click();
+    const governed = await dashboard("governed.orders", "warehouse");
+    assert.equal(await governed.getByRole("heading", { name: /Output ports/ }).count(), 1);
+    assert.equal(await governed.getByRole("heading", { name: "Contract", exact: true }).count(), 1);
+    assert.match(await governed.locator("body").innerText(), /08:00 UTC/);
+    await capture("feature-product-guarantees.png");
+    checkpoint("contract, output port and SLA rendered from bounded R metadata");
 
     for (const [id, status] of [
       ["passing.orders", "completed"],
@@ -258,15 +266,9 @@ exports.run = async () => {
       await idle();
       await command("Trial Product");
       await pick(id);
-      const result = await until(
-        () =>
-          currentJson(
-            (value) => value.kind === "trial" && value.data?.result?.id === id,
-          ),
-        `${id} real trial response`,
-      );
-      assert.equal(result.data.status, status);
-      assert.match(result.data.handle, /^result:/);
+      const result = await dashboard(id, status);
+      assert.equal(await result.locator(".badge").innerText(), status);
+      await capture(`feature-trial-${status}.png`);
       checkpoint(`${id}: ${status}`);
     }
     await idle();
@@ -279,16 +281,11 @@ exports.run = async () => {
       .filter({ hasText: /failed/ });
     await failedRow.first().waitFor();
     await failedRow.first().click();
-    const quality = await until(
-      () =>
-        currentJson(
-          (value) =>
-            value.asset === "failing.orders" && value.status === "failed",
-        ),
-      "failed quality evidence from tree click",
-    );
-    assert.equal(quality.n_failed, 1);
-    assert.equal(quality.n_total, 2);
+    const quality = await dashboard("failing.orders", "nonnegative");
+    const evidence = await quality.locator("main").innerText();
+    assert.match(evidence, /n failed\s+1/i);
+    assert.match(evidence, /n total\s+2/i);
+    await capture("feature-quality-evidence.png");
     checkpoint("quality tree reports one failure in two rows");
 
     await idle();
@@ -351,6 +348,7 @@ exports.run = async () => {
       }
     }, "real directed lineage webview node");
     await lineageButton.click();
+    await capture("feature-directed-lineage.png");
     await page
       .getByRole("treeitem", { selected: true })
       .filter({ hasText: "passing.orders" })
@@ -363,23 +361,12 @@ exports.run = async () => {
     // Revealing/expanding the lineage target loads detail asynchronously.
     // An explicit user inspection provides a completion boundary before the
     // next editor journey, rather than treating selection as request completion.
-    const previousDocument =
-      vscode.window.activeTextEditor?.document.uri.toString();
     await page
       .getByRole("treeitem", { selected: true })
       .filter({ hasText: "passing.orders" })
       .first()
       .click();
-    await until(async () => {
-      if (
-        vscode.window.activeTextEditor?.document.uri.toString() ===
-        previousDocument
-      )
-        return false;
-      return currentJson(
-        (value) => value.id === "passing.orders" && value.kind === "product",
-      );
-    }, "lineage target inspection completed in a new JSON document");
+    await dashboard("passing.orders", "Quality rules");
     await idle();
 
     const yamlUri = vscode.Uri.file(
@@ -405,7 +392,7 @@ exports.run = async () => {
           ),
       "active production custom-editor tab for the exact YAML document",
     );
-    await require("./host-webview.cjs").exerciseWebview(document, browser);
+    await require("./host-webview.cjs").exerciseWebview(document, browser, capture);
     checkpoint(
       "native webview buttons preview, discard, apply and reject stale YAML edits",
     );

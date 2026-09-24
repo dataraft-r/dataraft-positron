@@ -5,6 +5,7 @@ await build({
     "src/transport.ts",
     "src/protocol.ts",
     "src/render.ts",
+    "src/dashboard.ts",
     "src/contract-document.ts",
     "src/contract-editor.ts",
     "src/rule-diagnostics.ts",

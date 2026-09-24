@@ -68,7 +68,7 @@ async function frameLocator(page, frame) {
 
 exports.frameLocator = frameLocator;
 
-exports.exerciseWebview = async (document, existingBrowser) => {
+exports.exerciseWebview = async (document, existingBrowser, capture = async () => {}) => {
   const port = Number(process.env.DATARAFT_HOST_CDP_PORT);
   assert.ok(Number.isInteger(port) && port > 0, "Host CDP port is required");
   // Native Positron already tracks the workbench and its out-of-process
@@ -129,7 +129,10 @@ exports.exerciseWebview = async (document, existingBrowser) => {
             const proposed = await vscode.workspace.openTextDocument(
               tab.input.modified,
             );
-            if (proposed.getText().includes(`name: ${name}`)) return true;
+            if (proposed.getText().includes(`name: ${name}`)) {
+              if (name === "Applied form change") await capture("feature-yaml-diff.png");
+              return true;
+            }
           }
         }
       }, "actual proposed-edit diff with form value");
@@ -141,7 +144,10 @@ exports.exerciseWebview = async (document, existingBrowser) => {
     };
     const baseline = document.getText();
     assert.equal(document.isDirty, false);
+    await editor();
+    await capture("feature-yaml-editor.png");
     let frame = await preview("Discarded form change");
+    await capture("feature-yaml-preview.png");
     assert.equal(document.getText(), baseline, "preview must not edit YAML");
     await frame
       .getByRole("button", { name: "Discard preview", exact: true })
@@ -188,6 +194,7 @@ exports.exerciseWebview = async (document, existingBrowser) => {
           .count())
       );
     }, "applied YAML rendered with consumed preview");
+    await capture("feature-yaml-applied.png");
 
     await preview("Stale form change");
     const current = document.getText();

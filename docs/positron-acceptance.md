@@ -17,7 +17,8 @@ vapply(c("dataraft.core", "dataraft.ide", "dataraft.adapters", "yaml"),
 .libPaths()
 ```
 
-Use installed candidate R packages, including `dataraft.ide` 0.1.0.9003 or newer.
+Use installed candidate R packages, including `dataraft.ide` 0.1.0.9007 or newer
+for the product dashboard and port guarantees.
 The extension accesses the independent diagnostics channel through the public
 `dataraft.ide::ide_request()` boundary; operation helpers are internal.
 Install the extension on the **same host as R**;
@@ -32,6 +33,7 @@ following as UTF-8 `acceptance.R` inside it:
 
 ```r
 library(dataraft.core)
+library(dataraft.adapters)
 
 nonnegative <- function(data) {
   all(data$amount >= 0)
@@ -46,6 +48,10 @@ slow <- dr_product("slow", function() {
   Sys.sleep(10)
   data.frame(id = 1L)
 })
+governed <- dr_product("governed", data.frame(id = 1L),
+  contract = dr_contract("governed", columns = c(id = "integer"))) |>
+  dr_add_output(dr_output("warehouse", dr_target_rds("out/warehouse"),
+    sla = dr_sla(available_by = "08:00", timezone = "Europe/Berlin")))
 ```
 
 Set R's working directory to that folder and run:
@@ -66,6 +72,8 @@ observed behavior and any issue link.
 | Check | Action | Required observation |
 | --- | --- | --- |
 | Selection | **DataRaft: Select R Session**, choose this R console; **DataRaft: Select Workspace or Lake**, choose Workspace. | `orders`, `passing` and `slow` appear; no new R session starts and no source runs during discovery. |
+| Overview | **DataRaft: Open Data Product Overview**, select `governed` using the visible button and keyboard. | Counts describe the snapshot, product opens a structured page, focus remains visible and no raw JSON editor appears. |
+| Guarantees | Inspect `governed` and resize the webview to a narrow pane. | Output port, 08:00 deadline and contract columns remain readable without horizontal clipping; the target path is absent. |
 | Metadata | **DataRaft: Inspect Product**, choose `orders`; expand its rules. | Named `nonnegative` rule is visible. Metadata contains no table cells or function body. |
 | Failed trial | **DataRaft: Trial Product**, choose `orders`. | A retained trial result appears with status `blocked`; quality evidence reports `nonnegative` failed. The request completes without publishing. |
 | R diagnostics | Right-click that **result**, then **DataRaft: Show R Rule Diagnostics** (`dataraft.showRuleDiagnostics`). Open Problems and select the diagnostic. | The diagnostic opens the actual `nonnegative` function in `acceptance.R`, at its source range. It does not guess the product call's line. |

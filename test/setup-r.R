@@ -25,10 +25,10 @@ install.packages(c(
 # Minimal integration subset of the merged umbrella family-lock.json.
 # Explicit refs preserve the tested combination without following main.
 refs <- c(
-  dataraft.core = "69d0212bdd6b1e1e8a93fd948d3616f9cdad5092",
-  dataraft.lake = "842a0fc24ac6dcb57a83789a0ccd517905c53b9b",
-  dataraft.adapters = "946e037d5e93835bc9b516d85b3dc1df50f2f032",
-  dataraft.ide = "636213398632524bd5d22581eb2779c64beb8a8f"
+  dataraft.core = "a94e8e11c46cedfc4ac9640a73ac7caae5cae5c9",
+  dataraft.lake = "6fb0a57d4e4b3157636933594c64b3637184a51e",
+  dataraft.adapters = "8af12ffb0a45569f9326ed4905b50c6c2498ac11",
+  dataraft.ide = "63f6958774311999ce5a0f5ae5a2bce2d561a65b"
 )
 for (package in names(refs)) {
   # Hard dependencies are installed above, in dependency order. Disabling

@@ -1,6 +1,6 @@
 # DataRaft for Positron
 
-Inspect governed data products, releases and quality evidence in an existing R session. Edit ODCS 3.2 contract YAML in Positron or VS Code.
+Inspect governed data products, releases and quality evidence in an existing R session. Structured product pages show contracts, lifecycle state, input and output ports, delivery SLA, rules and sources. Edit ODCS 3.2 contract YAML through a guided form in Positron or VS Code.
 
 ## Install
 
@@ -17,7 +17,9 @@ Use **Extensions: Install from VSIX** and select `dataraft-positron.vsix`. Live 
 1. Start an R console in Positron and create your products or connect your lake.
 2. Run **DataRaft: Select R Session**. The extension never starts a session.
 3. Run **DataRaft: Select Workspace or Lake** to choose a context, or **Refresh Metadata** to inspect workspace definitions.
-4. Expand products for contracts, columns, rules and sources. Inspect a lake product to load its releases. Quality, runs, freshness and incidents show metadata with their generation timestamps.
+4. Run **Open Data Product Overview** for a workspace summary, then open a product for its contract, ports and explicit Trial, View, Lineage and Refresh actions. Expand products for details and lake releases. Quality, runs, freshness and incidents show metadata with their generation timestamps.
+
+Product lifecycle and port details require `dataraft.ide` 0.1.0.9007 or newer. Older bridges remain readable and the page explains which guarantees are unavailable. SLA information is descriptive in this view; an SLA can be evaluated on publication in R. Changes to lifecycle state, policies, dependencies and backfills remain R operations; the extension does not implicitly publish, promote or rewrite a partition.
 
 Refresh is manual. Expanding an uncached product requests its detail. No background polling, automatic trials, approvals or publishing occur. A busy R session rejects execution requests. Switching sessions invalidates responses still in flight.
 
@@ -33,7 +35,7 @@ The saved-file baseline comes from opening the editor and explicit saves. If ano
 
 ## VS Code and remote workspaces
 
-Without Positron, **Open Metadata JSON** displays metadata-channel snapshots and the YAML editor remains available. Live R commands explain that Positron is required. Untrusted workspaces allow offline JSON and YAML editing only.
+Without Positron, **Open Metadata JSON** loads metadata-channel snapshots into the same structured views and the YAML editor remains available. Live R commands explain that Positron is required. Untrusted workspaces allow offline snapshot inspection and YAML editing only.
 
 This is a workspace extension: in Positron Workbench or a remote workspace, install it on the same host as the R session. Both must access the same temporary directory and saved YAML paths. A local extension host with a separately hosted R session is unsupported.
 
