@@ -420,11 +420,14 @@ exports.run = async () => {
     // installed example that the R test suite executes. Drive its actual
     // products through the native workbench and retain focused captures.
     await idle();
+    await stage();
     await refresh();
     await command("Open Data Product Overview");
-    const portfolioOverview = await dashboard("Data products", "portfolio.relational_model");
-    assert.match(await portfolioOverview.locator("main").innerText(),
-      /portfolio\.lapse_rate_by_channel/);
+    await until(async () => {
+      const view = await dashboard("Data products", "portfolio.relational_model");
+      return (await view.getByRole("button", { name: "Inspect product" })
+        .count().catch(() => 0)) === 12;
+    }, "twelve inspectable products in the refreshed overview");
     await capture("portfolio-overview.png");
     checkpoint("six-table portfolio and downstream products in native overview");
 
