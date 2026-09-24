@@ -4,6 +4,8 @@ Inspect governed data products, releases and quality evidence in an existing R s
 
 ## Install
 
+Download the [latest GitHub VSIX release](https://github.com/dataraft-r/dataraft-positron/releases). In Positron, run **Extensions: Install from VSIX** and select the downloaded `.vsix` file. Live R features need the separate `dataraft.ide` package in the selected R session.
+
 Build with Node 22 or newer:
 
 ```sh

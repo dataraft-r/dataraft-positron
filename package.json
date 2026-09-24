@@ -2,7 +2,7 @@
   "name": "dataraft-positron",
   "displayName": "DataRaft",
   "description": "Inspect governed data products and quality evidence in Positron; edit contract YAML in VS Code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "dataraft-r",
   "license": "MIT",
   "repository": {
