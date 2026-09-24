@@ -409,35 +409,166 @@
       }
     },
     "guarantees": {
-      "type": "object", "additionalProperties": false,
-      "required": ["lifecycle", "inputs", "outputs", "policy_count"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lifecycle",
+        "inputs",
+        "outputs",
+        "policy_count"
+      ],
       "properties": {
-        "lifecycle": {"type": ["string", "null"]},
-        "inputs": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/port"}},
-        "outputs": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/port"}},
-        "policy_count": {"type": "integer", "minimum": 0}
+        "lifecycle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputs": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/port"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/port"
+          }
+        },
+        "policy_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "policies": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "version",
+              "when",
+              "action"
+            ],
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "when": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "action": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "port": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "direction", "version", "access", "contract_version", "sla"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "direction",
+        "version",
+        "access",
+        "contract_version",
+        "sla"
+      ],
       "properties": {
-        "id": {"type": "string"},
-        "direction": {"enum": ["input", "output"]},
-        "version": {"type": ["string", "null"]},
-        "access": {"type": ["string", "null"]},
-        "contract_version": {"type": ["string", "null"]},
-        "sla": {"anyOf": [{"$ref": "#/$defs/sla"}, {"type": "null"}]}
+        "id": {
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "input",
+            "output"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "access": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contract_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sla": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sla"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
     "sla": {
-      "type": "object", "additionalProperties": false,
-      "required": ["refresh", "available_by", "timezone", "freshness"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "refresh",
+        "available_by",
+        "timezone",
+        "freshness"
+      ],
       "properties": {
-        "refresh": {"type": ["string", "null"]},
-        "available_by": {"type": ["string", "null"]},
-        "timezone": {"type": ["string", "null"]},
-        "freshness": {"type": ["number", "null"]}
+        "refresh": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "available_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "freshness": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
       }
     },
     "context": {

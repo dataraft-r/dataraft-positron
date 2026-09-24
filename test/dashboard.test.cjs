@@ -32,6 +32,8 @@ test("product dashboard exposes guarantees as readable controls and escapes untr
       },
     ],
     policy_count: 2,
+    policies: [{ id: "owner", version: "2", when: "publish", action: "block" },
+      { id: "<script>alert(1)</script>", version: "1", when: "validate", action: "warn" }],
   };
   const response = { ...fixture("product"), data: detail };
   validateEnvelope(response);
@@ -39,6 +41,9 @@ test("product dashboard exposes guarantees as readable controls and escapes untr
   assert.match(html, /Lifecycle/);
   assert.match(html, /warehouse/);
   assert.match(html, /08:00/);
+  assert.match(html, /Policy checks/);
+  assert.match(html, /owner/);
+  assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
   assert.match(html, /Trial without publishing/);
   assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /&lt;img src=x/);
