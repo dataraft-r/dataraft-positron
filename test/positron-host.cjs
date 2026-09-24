@@ -249,7 +249,8 @@ exports.run = async () => {
     const overview = await dashboard("Data products", "passing.orders");
     assert.equal(await overview.getByRole("button", { name: "Inspect product" }).count(), 12);
     await capture("feature-overview.png");
-    await fs.copyFile(path.join(artifacts, "feature-overview.png"), path.join(artifacts, "portfolio-overview.png"));
+    await overview.getByText("portfolio.lapse_rate_by_channel", { exact: true }).scrollIntoViewIfNeeded();
+    await capture("portfolio-overview.png", false);
     checkpoint("workspace overview lists three smoke fixtures and nine portfolio products");
     await page
       .getByRole("treeitem")
