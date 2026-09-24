@@ -19,6 +19,13 @@ import {
 } from "./protocol";
 import { MetadataNode, MetadataTree } from "./tree";
 import { lineageHtml } from "./render";
+import {
+  contractHtml,
+  overviewHtml,
+  productHtml,
+  recordHtml,
+  snapshotHtml,
+} from "./dashboard";
 import { registerYamlEditor } from "./contract-editor";
 import { RuleDiagnostics, RuleLocation } from "./rule-diagnostics";
 export function activate(context: vscode.ExtensionContext): void {
@@ -108,6 +115,7 @@ class Controller implements vscode.Disposable {
     command("selectSession", () => this.selectSession());
     command("selectContext", () => this.selectContext());
     command("refresh", () => this.refresh());
+    command("overview", () => this.overview());
     command("openMetadata", () => this.openMetadata());
     command("inspect", (node?: MetadataNode) => this.inspect(node));
     command("trial", (node?: MetadataNode) => this.trial(node));
@@ -383,18 +391,56 @@ class Controller implements vscode.Disposable {
       )
     )?.node;
   }
-  private async json(value: unknown, title?: string): Promise<void> {
-    const document = await vscode.workspace.openTextDocument({
-      language: "json",
-      content: JSON.stringify(value, null, 2),
+  private async overview(): Promise<void> {
+    if (
+      !this.trees.get("products")!.roots.length &&
+      !this.offline &&
+      this.sessionId
+    )
+      await this.refresh();
+    const roots = this.trees.get("products")!.roots;
+    const quality = this.snapshots.get("quality");
+    const runs = this.snapshots.get("runs");
+    const panel = this.openDashboard(
+      "Overview",
+      overviewHtml(
+        roots.flatMap((n) => (n.product ? [n.product] : [])),
+        quality ? items<RecordRow>(quality) : [],
+        runs ? items<RecordRow>(runs) : [],
+        this.snapshots.get("products")?.generated ?? new Date().toISOString(),
+        randomBytes(16).toString("hex"),
+      ),
+    );
+    const generation = this.generation;
+    const listener = panel.webview.onDidReceiveMessage((message) => {
+      if (
+        this.disposed ||
+        generation !== this.generation ||
+        message?.type !== "product" ||
+        !Number.isInteger(message.index)
+      )
+        return;
+      const selected = roots[message.index];
+      if (selected?.product)
+        void this.inspect(selected).catch((e) =>
+          vscode.window.showErrorMessage(
+            e instanceof Error ? e.message : "Could not inspect product.",
+          ),
+        );
     });
-    await vscode.window.showTextDocument(document, { preview: true });
-    if (title) vscode.window.setStatusBarMessage(title, 4000);
+    panel.onDidDispose(() => listener.dispose());
   }
   private async inspect(node?: MetadataNode): Promise<void> {
     if (node && !node.product) {
-      await this.json(
-        node.value ?? { label: node.label, description: node.description },
+      const parent = node.parent;
+      if (parent?.product) return this.inspect(parent);
+      this.openDashboard(
+        node.label,
+        recordHtml(
+          node.label,
+          node.value ?? { description: node.description },
+          randomBytes(16).toString("hex"),
+        ),
       );
       return;
     }
@@ -413,7 +459,63 @@ class Controller implements vscode.Disposable {
           .attachReleases(selected, items<RecordRow>(releases));
       }
     }
-    await this.json(detail ?? selected.product);
+    const product = detail ?? (selected.value as ProductDetail);
+    const panel = this.openDashboard(
+      product.id,
+      productHtml(
+        product,
+        new Date().toISOString(),
+        randomBytes(16).toString("hex"),
+      ),
+    );
+    const generation = this.generation;
+    const listener = panel.webview.onDidReceiveMessage(async (message) => {
+      if (
+        generation !== this.generation ||
+        this.disposed ||
+        !message ||
+        !["trial", "view", "lineage", "refresh"].includes(message.action)
+      )
+        return;
+      try {
+        if (message.action === "trial") await this.trial(selected);
+        if (message.action === "view") await this.viewRows(selected);
+        if (message.action === "lineage") await this.lineage(selected);
+        if (message.action === "refresh") {
+          this.details.delete(selected.product!.handle);
+          const updated = await this.loadDetail(selected.product!);
+          if (updated && generation === this.generation && !this.disposed) {
+            panel.webview.html = productHtml(
+              updated,
+              new Date().toISOString(),
+              randomBytes(16).toString("hex"),
+            );
+            this.trees.get("products")!.populate(selected, updated);
+          }
+        }
+      } catch (e) {
+        vscode.window.showErrorMessage(
+          e instanceof Error ? e.message : "DataRaft action failed.",
+        );
+      }
+    });
+    panel.onDidDispose(() => listener.dispose());
+  }
+
+  private openDashboard(title: string, html: string): vscode.WebviewPanel {
+    const panel = vscode.window.createWebviewPanel(
+      "dataraft.dashboard",
+      `DataRaft · ${title}`,
+      vscode.ViewColumn.Beside,
+      { enableScripts: true, localResourceRoots: [] },
+    );
+    this.lineagePanels.add(panel);
+    panel.webview.html = html;
+    const closed = panel.onDidDispose(() => {
+      closed.dispose();
+      this.lineagePanels.delete(panel);
+    });
+    return panel;
   }
   private async trial(node?: MetadataNode): Promise<void> {
     const selected = await this.pickProduct(node);
@@ -442,9 +544,17 @@ class Controller implements vscode.Disposable {
     this.trees.get("products")!.roots.push(result);
     this.trees.get("products")!.populate(result, data.result);
     this.trees.get("products")!.refresh();
-    await this.json(
-      response,
-      "Trial completed. No configured target was published.",
+    this.openDashboard(
+      "Trial result",
+      productHtml(
+        data.result,
+        response.generated,
+        randomBytes(16).toString("hex"),
+      ),
+    );
+    vscode.window.setStatusBarMessage(
+      "Trial completed. No target was published.",
+      5000,
     );
   }
   private async showRuleDiagnostics(node?: MetadataNode): Promise<void> {
@@ -571,7 +681,10 @@ class Controller implements vscode.Disposable {
         "Open a report metadata snapshot or select a live lake context.",
       );
     this.snapshots.set("reports", response);
-    await this.json(response);
+    this.openDashboard(
+      "Reports",
+      snapshotHtml(response, randomBytes(16).toString("hex")),
+    );
   }
   private async savedContract(
     uri?: vscode.Uri,
@@ -598,13 +711,20 @@ class Controller implements vscode.Disposable {
   }
   private async validateContract(uri?: vscode.Uri): Promise<void> {
     const saved = await this.savedContract(uri);
-    if (saved)
-      await this.json(
-        await this.request({
-          operation: "validate_contract",
-          file_path: saved.fsPath,
-        }),
+    if (saved) {
+      const response = await this.request({
+        operation: "validate_contract",
+        file_path: saved.fsPath,
+      });
+      this.openDashboard(
+        "Contract validation",
+        contractHtml(
+          "Validated saved contract",
+          response.data as ProductDetail["contract"],
+          randomBytes(16).toString("hex"),
+        ),
       );
+    }
   }
   private async profile(): Promise<Envelope | undefined> {
     const selected = await this.pickProduct();
@@ -617,7 +737,14 @@ class Controller implements vscode.Disposable {
       operation: "profile",
       handle: selected.product.handle,
     });
-    await this.json(response);
+    this.openDashboard(
+      "Table profile",
+      contractHtml(
+        "Inferred table schema",
+        response.data as ProductDetail["contract"],
+        randomBytes(16).toString("hex"),
+      ),
+    );
     return response;
   }
   private async sampleQuality(uri?: vscode.Uri): Promise<Envelope | undefined> {
@@ -637,7 +764,10 @@ class Controller implements vscode.Disposable {
           .getConfiguration("dataraft")
           .get<number>("maximumRows", 100),
       });
-      await this.json(response);
+      this.openDashboard(
+        "Sample quality",
+        snapshotHtml(response, randomBytes(16).toString("hex")),
+      );
       return response;
     }
   }
@@ -690,6 +820,19 @@ class Controller implements vscode.Disposable {
       );
     } else this.apply(response);
     if (response.kind === "lineage") await this.lineage();
-    else if (!this.trees.has(response.kind)) await this.json(response);
+    else if (["reports", "sample_quality"].includes(response.kind))
+      this.openDashboard(
+        response.kind,
+        snapshotHtml(response, randomBytes(16).toString("hex")),
+      );
+    else if (!this.trees.has(response.kind))
+      this.openDashboard(
+        response.kind,
+        recordHtml(
+          response.kind,
+          response.data,
+          randomBytes(16).toString("hex"),
+        ),
+      );
   }
 }

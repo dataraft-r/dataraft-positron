@@ -37,6 +37,12 @@ export interface Product {
   can_view: boolean;
 }
 export interface ProductDetail extends Product {
+  guarantees?: {
+    lifecycle: string | null;
+    inputs: Port[];
+    outputs: Port[];
+    policy_count: number;
+  };
   contract: null | {
     id: string | null;
     version: string | null;
@@ -50,6 +56,19 @@ export interface ProductDetail extends Product {
     action: string | null;
     dimension: string | null;
   }[];
+}
+export interface Port {
+  id: string;
+  direction: "input" | "output";
+  version: string | null;
+  access: string | null;
+  contract_version: string | null;
+  sla: null | {
+    refresh: string | null;
+    available_by: string | null;
+    timezone: string | null;
+    freshness: number | null;
+  };
 }
 export interface Context {
   handle: string;

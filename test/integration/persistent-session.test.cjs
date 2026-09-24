@@ -144,6 +144,16 @@ test(
       );
       await request({ operation: "product", handle: orders.handle });
       await request({ operation: "product", handle: workflow.handle });
+      const governed = products.items.find((x) => x.id === "governed");
+      assert.ok(governed);
+      const detail = await request({
+        operation: "product",
+        handle: governed.handle,
+      });
+      assert.equal(detail.guarantees.outputs[0].id, "warehouse");
+      assert.equal(detail.guarantees.outputs[0].sla.available_by, "08:00");
+      assert.equal(detail.guarantees.lifecycle, null);
+      assert.ok(!JSON.stringify(detail).includes("PRIVATE_TARGET_PATH"));
       await request({ operation: "lineage" });
       const published = await request({
         operation: "products",
@@ -201,7 +211,10 @@ test(
       t.after(() => rm(outside, { recursive: true, force: true }));
       const outsideContract = join(outside, "outside.yaml");
       await writeFile(outsideContract, await readFile(contractFile));
-      await request({ operation: "validate_contract", file_path: outsideContract }, "unsafe_path");
+      await request(
+        { operation: "validate_contract", file_path: outsideContract },
+        "unsafe_path",
+      );
       // The next request must still complete after an actual R containment error.
 
       const contract = await request({
@@ -330,8 +343,8 @@ test(
       );
       assert.equal(
         responseCount,
-        29,
-        "28 existing responses plus containment rejection and queue recovery",
+        30,
+        "29 existing responses plus containment rejection and queue recovery",
       );
       t.diagnostic(
         `${responseCount} real R responses passed file transport, canonical JSON Schema and Node protocol checks`,

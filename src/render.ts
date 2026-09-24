@@ -13,10 +13,11 @@ export function htmlDocument(
   body: string,
   nonce: string,
   script = "",
+  styles = "",
 ): string {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';"><title>${escapeHtml(title)}</title><style nonce="${nonce}">
  :root {color-scheme:light dark} body{font:var(--vscode-font-size) var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);padding:1.25rem;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.1rem}button,input,select,textarea{font:inherit;color:var(--vscode-input-foreground);background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);padding:.4rem .65rem}button{cursor:pointer;color:var(--vscode-button-foreground);background:var(--vscode-button-background);border-color:var(--vscode-button-border)}button:hover{background:var(--vscode-button-hoverBackground)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--vscode-focusBorder);outline-offset:2px}.muted{color:var(--vscode-descriptionForeground)}table{border-collapse:collapse}td,th{text-align:left;vertical-align:top;padding:.5rem;border-bottom:1px solid var(--vscode-panel-border)}label{display:block;margin:.7rem 0}.graph{position:relative;overflow:auto;border:1px solid var(--vscode-panel-border)}.graph svg{display:block}.edge{stroke:var(--vscode-foreground);fill:none;stroke-width:1.5}.edge-arrow{fill:var(--vscode-foreground)}.node rect{fill:var(--vscode-editor-background);stroke:var(--vscode-focusBorder);stroke-width:1.5}.node text{fill:var(--vscode-foreground);font-size:13px}.node{cursor:pointer}.node:focus{outline:none}.node:focus rect{stroke-width:3}.warning{border-left:3px solid var(--vscode-editorWarning-foreground);padding-left:1rem}pre{white-space:pre-wrap;word-break:break-word}a{color:var(--vscode-textLink-foreground)}
- </style></head><body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ""}</body></html>`;
+ ${styles}</style></head><body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ""}</body></html>`;
 }
 /** Rank strongly connected components, then their condensation DAG.
  * Sorting makes positions independent of registry row/edge ordering. Cycles

@@ -15,6 +15,21 @@ import { Envelope } from "./protocol";
 import { escapeHtml, htmlDocument } from "./render";
 
 const snapshots = new Map<string, string>();
+const editorStyles = `
+body{max-width:1000px;margin:auto;padding:clamp(1rem,3vw,2rem)}
+.editor-intro{max-width:72ch;color:var(--vscode-descriptionForeground)}
+.editor-toolbar{display:flex;flex-wrap:wrap;gap:.6rem;margin:1.2rem 0 1.7rem}
+.editor-toolbar button{min-height:36px;border-radius:5px}
+details.editor-section{border:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background);border-radius:8px;margin:1rem 0;padding:.8rem 1rem}
+details.editor-section>summary{cursor:pointer;font-size:1.08rem;font-weight:600;padding:.2rem 0}
+details.editor-section>summary:focus-visible{outline:2px solid var(--vscode-focusBorder);outline-offset:3px}
+.editor-section fieldset{border:1px solid var(--vscode-panel-border);border-radius:6px;margin:.9rem 0;padding:1rem}
+.editor-section label{display:grid;grid-template-columns:minmax(120px,32%) minmax(0,1fr);align-items:center;gap:.5rem 1rem}
+.editor-section input:not([type=checkbox]),.editor-section select{width:100%;box-sizing:border-box}
+.editor-primary{position:sticky;bottom:0;padding:1rem 0;background:var(--vscode-editor-background)}
+.editor-primary button{min-height:38px;border-radius:5px}
+@media(max-width:520px){.editor-section label{grid-template-columns:1fr}}
+`;
 let snapshotId = 0;
 function snapshot(text: string, name: string): vscode.Uri {
   const uri = vscode.Uri.from({
@@ -90,11 +105,11 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
                 ),
             ),
           );
-          body = `<h1>ODCS contract</h1><p>The YAML document is authoritative. Preview edits, then apply them to the unsaved document. Saving remains explicit.</p><p class="muted">This editor checks YAML and field types. Predicate execution and full import compatibility are validated by DataRaft in R.</p><button data-command="text">Open YAML text</button> <button data-command="diff">Compare with saved file</button> <button data-command="validate">Validate saved contract in R</button> <button data-command="profile">Propose columns from R sample</button> <button data-command="sample">Check selected R sample</button>`;
+          body = `<h1>ODCS contract</h1><p class="editor-intro">Define the contract here. Preview and review changes before applying them to the unsaved YAML document. Save explicitly when ready.</p><div class="editor-toolbar"><button data-command="text">Open YAML text</button><button data-command="diff">Compare with saved file</button><button data-command="validate">Validate saved contract in R</button><button data-command="profile">Propose columns from R sample</button><button data-command="sample">Check selected R sample</button></div><p class="muted">Schema checks here do not execute predicates. Use R validation for the saved contract.</p>`;
           if (form.issues.length)
             body += `<h2>Fix YAML diagnostics</h2><ul>${form.issues.map((issue) => `<li>${escapeHtml(issue.message)}</li>`).join("")}</ul>`;
           else {
-            body += `<form id="contract-form"><h2>Contract</h2>${form.fields.map(input).join("")}<h2>Columns</h2>${form.columns.map((fields, index) => `<fieldset><legend>Column ${index + 1}</legend>${fields.map(input).join("")}<button type="button" data-operation="removeColumn" data-index="${index}">Preview removing column</button></fieldset>`).join("")}<button type="button" data-operation="addColumn">Preview new column</button><h2>Quality rules</h2>${form.rules.map((fields, index) => `<fieldset><legend>Rule ${index + 1}</legend>${fields.map(input).join("")}<button type="button" data-operation="removeRule" data-index="${index}">Preview removing rule</button></fieldset>`).join("")}<button type="button" data-operation="addRule">Preview new rule</button><p><button type="submit">Preview field edits</button></p></form>`;
+            body += `<form id="contract-form"><details class="editor-section" open><summary>Contract</summary>${form.fields.map(input).join("")}</details><details class="editor-section" open><summary>Columns (${form.columns.length})</summary>${form.columns.map((fields, index) => `<fieldset><legend>Column ${index + 1}</legend>${fields.map(input).join("")}<button type="button" data-operation="removeColumn" data-index="${index}">Preview removing column</button></fieldset>`).join("")}<button type="button" data-operation="addColumn">Preview new column</button></details><details class="editor-section"><summary>Quality rules (${form.rules.length})</summary>${form.rules.map((fields, index) => `<fieldset><legend>Rule ${index + 1}</legend>${fields.map(input).join("")}<button type="button" data-operation="removeRule" data-index="${index}">Preview removing rule</button></fieldset>`).join("")}<button type="button" data-operation="addRule">Preview new rule</button></details><p class="editor-primary"><button type="submit">Preview field edits</button></p></form>`;
           }
           if (proposal)
             body +=
@@ -112,6 +127,7 @@ export function registerYamlEditor(context: vscode.ExtensionContext): void {
           body,
           randomBytes(16).toString("hex"),
           script,
+          editorStyles,
         );
       };
       const disposables = [

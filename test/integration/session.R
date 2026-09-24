@@ -22,6 +22,11 @@ workspace$orders <- dr_product(
 )
 workspace$workflow <- dr_product("workflow") |>
   dr_add_source(function() stop("SOURCE_BODY_MUST_NOT_LEAK"))
+workspace$governed <- dr_product("governed", data.frame(id = 1L),
+  contract = dr_contract("governed", columns = c(id = "integer"))) |>
+  dr_add_output(dr_output("warehouse",
+    dataraft.adapters::dr_target_rds(file.path(root, "PRIVATE_TARGET_PATH")),
+    sla = dr_sla(available_by = "08:00", timezone = "UTC")))
 workspace$model <- dr_product(
   "portfolio",
   dm::dm(customers = data.frame(id = 1:2))
