@@ -136,6 +136,7 @@ async function main() {
         "--disable-workspace-trust",
         "--skip-welcome",
         "--skip-release-notes",
+        "--window-size=1600,1000",
         "--remote-debugging-address=127.0.0.1",
         `--remote-debugging-port=${port}`,
       ],

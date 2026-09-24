@@ -162,7 +162,16 @@ exports.run = async () => {
           return await require("./host-webview.cjs").frameLocator(page, frame);
         }
       }, `visible structured dashboard ${heading}`);
-    const capture = (name) => page.screenshot({ path: path.join(artifacts, name) });
+    const stage = async () => {
+      await vscode.commands.executeCommand("workbench.action.closeOtherEditors");
+      await vscode.commands.executeCommand("workbench.action.editorLayoutSingle");
+      await vscode.commands.executeCommand("workbench.action.closePanel");
+      await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
+    };
+    const capture = async (name, prepare = true) => {
+      if (prepare) await stage();
+      await page.screenshot({ path: path.join(artifacts, name) });
+    };
     const quickInput = page.locator(
       ".quick-input-widget .quick-input-box input",
     );
@@ -219,7 +228,7 @@ exports.run = async () => {
         { exact: true },
       )
       .waitFor();
-    await capture("feature-select-session.png");
+    await capture("feature-select-session.png", false);
     await quickRows.filter({ hasText: sessionId }).click();
     // Reveal the view container through the workbench command. All tested
     // DataRaft actions below still use actual command-palette and tree clicks.
@@ -335,6 +344,7 @@ exports.run = async () => {
 
     await idle();
     await command("Show Directed Lineage");
+    await stage();
     const lineageButton = await until(async () => {
       for (const frame of page.frames()) {
         const button = frame.getByRole("button", {
@@ -350,7 +360,8 @@ exports.run = async () => {
           return button.first();
       }
     }, "real directed lineage webview node");
-    await lineageButton.click();
+    await lineageButton.focus();
+    await lineageButton.press("Enter");
     await capture("feature-directed-lineage.png");
     await page
       .getByRole("treeitem", { selected: true })
@@ -395,7 +406,10 @@ exports.run = async () => {
           ),
       "active production custom-editor tab for the exact YAML document",
     );
-    await require("./host-webview.cjs").exerciseWebview(document, browser, capture);
+    await stage();
+    await require("./host-webview.cjs").exerciseWebview(
+      document, browser, (name) => capture(name, false),
+    );
     checkpoint(
       "native webview buttons preview, discard, apply and reject stale YAML edits",
     );
