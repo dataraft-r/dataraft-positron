@@ -397,7 +397,6 @@ exports.run = async () => {
     );
     const document = await vscode.workspace.openTextDocument(yamlUri);
     await vscode.window.showTextDocument(document);
-    await stage();
     await command("Open Contract YAML Editor");
     await until(
       () =>
@@ -412,6 +411,7 @@ exports.run = async () => {
           ),
       "active production custom-editor tab for the exact YAML document",
     );
+    await stage();
     await require("./host-webview.cjs").exerciseWebview(
       document, browser, (name) => capture(name, false),
     );
@@ -440,8 +440,6 @@ exports.run = async () => {
     assert.match(kpiText, /named_owner/);
     assert.match(kpiText, /08:00 UTC/);
     await capture("portfolio-product-contract.png");
-    await kpi.getByText("08:00 UTC").first().scrollIntoViewIfNeeded();
-    await capture("portfolio-delivery.png", false);
     checkpoint("KPI contract, policy, SLA and output port are readable");
 
     await idle();
@@ -483,8 +481,6 @@ exports.run = async () => {
     }, "portfolio lineage node");
     await portfolioNode.focus();
     await portfolioNode.press("Enter");
-    if ((await vscode.commands.getCommands(true)).includes("notifications.clearAll"))
-      await vscode.commands.executeCommand("notifications.clearAll");
     await capture("portfolio-lineage.png");
     checkpoint("product dependency graph links inputs to the lapse KPI");
 
