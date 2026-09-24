@@ -74,6 +74,7 @@ async function main() {
         "update.mode": "none",
         "telemetry.telemetryLevel": "off",
         "workbench.startupEditor": "none",
+        "git.openRepositoryInParentFolders": "never",
         "positron.r.customBinaries": [rExecutable],
         "positron.r.interpreters.default": rExecutable,
         "positron.r.interpreters.override": [rExecutable],

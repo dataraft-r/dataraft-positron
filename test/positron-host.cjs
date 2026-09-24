@@ -221,6 +221,9 @@ exports.run = async () => {
       }, "all five metadata views refreshed, including final incidents response");
       await idle();
     };
+    await vscode.commands.executeCommand("workbench.action.closePanel");
+    await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
+    await vscode.commands.executeCommand("workbench.view.extension.dataraft");
     await command("Select R Session");
     await page
       .getByPlaceholder(
