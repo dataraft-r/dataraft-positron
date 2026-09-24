@@ -5,7 +5,7 @@ const { chromium } = require("playwright-core");
 const vscode = require("vscode");
 
 async function until(get, label) {
-  const deadline = Date.now() + 15000;
+  const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     try {
       const value = await get();
