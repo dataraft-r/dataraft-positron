@@ -42,6 +42,7 @@ export interface ProductDetail extends Product {
     inputs: Port[];
     outputs: Port[];
     policy_count: number;
+    policies?: { id: string | null; version: string | null; when: string | null; action: string | null }[];
   };
   contract: null | {
     id: string | null;
