@@ -6,6 +6,8 @@ Inspect governed data products, releases and quality evidence in an existing R s
 
 Download the [latest GitHub VSIX release](https://github.com/dataraft-r/dataraft-positron/releases). In Positron, run **Extensions: Install from VSIX** and select the downloaded `.vsix` file. Live R features need the separate `dataraft.ide` package in the selected R session.
 
+After each successful `main` CI run, [GitHub Releases](https://github.com/dataraft-r/dataraft-positron/releases) also provides an automatic development VSIX named with its source commit and a matching SHA-256 file. These previews keep the embedded extension version from `package.json`; reinstall the VSIX explicitly to test a new commit. A versioned release with its own notes takes precedence when the package version changes.
+
 Build with Node 22 or newer:
 
 ```sh
