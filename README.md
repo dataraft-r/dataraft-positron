@@ -1,6 +1,18 @@
 # DataRaft for Positron
 
-Inspect governed data products, releases and quality evidence in an existing R session. Structured product pages show contracts, lifecycle state, input and output ports, delivery SLA, rules and sources. Edit ODCS 3.2 contract YAML through a guided form in Positron or VS Code.
+**See your DataRaft products, checks and releases inside your editor.**
+
+Use this optional extension when you want to inspect a product in an existing R session or edit an ODCS contract through a guided form. It shows structured product, quality and lineage views; it uses the separate `dataraft.ide` R bridge for live metadata. DataRaft itself starts in the [main repository](https://github.com/dataraft-r/dataraft).
+
+[Install the extension](#install) · [See the DataRaft workflow](https://dataraft-r.github.io/dataraft/about/) · [IDE bridge](https://github.com/dataraft-r/dataraft.ide)
+
+## First look
+
+1. Install the VSIX and `dataraft.ide`, then start an R session in Positron.
+2. Define a product in R and choose **DataRaft: Select R Session**.
+3. Open **DataRaft: Open Data Product Overview** to inspect the workspace. Select a product to see its contract, rules and available actions.
+
+Trials and row views require an explicit action. The extension does not publish data for you. Contract edits are previewed before applying and remain unsaved until you save them.
 
 ## Install
 
