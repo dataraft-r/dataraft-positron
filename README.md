@@ -9,7 +9,14 @@ Use this optional extension when you want to inspect a product in an existing R 
 ## First look
 
 1. Install the VSIX and `dataraft.ide`, then start an R session in Positron.
-2. Define a product in R and choose **DataRaft: Select R Session**.
+2. Define a product in R, then choose **DataRaft: Select R Session**:
+
+   ```r
+   orders <- dataraft.core::dr_product(
+     "orders", data.frame(id = 1L, amount = 25)
+   ) |>
+     dataraft.core::dr_add_quality(~ amount >= 0)
+   ```
 3. Open **DataRaft: Open Data Product Overview** to inspect the workspace. Select a product to see its contract, rules and available actions.
 
 Trials and row views require an explicit action. The extension does not publish data for you. Contract edits are previewed before applying and remain unsaved until you save them.
